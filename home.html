@@ -1,0 +1,13 @@
+{% block title %}
+BareTag BackEnd
+{% endblock %}
+
+{% block content %}
+<h1>Welcome to the BareTag Tool Tracker App!</h1>
+
+<!-- Add buttons or links for registration and login -->
+<div>
+    <a href="{{ url_for('registrationform') }}" class="btn btn-primary">Register</a>
+    <a href="{{ url_for('login') }}" class="btn btn-secondary">Log In</a>
+</div>
+{% endblock %}
