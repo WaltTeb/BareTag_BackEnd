@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import json
 import sqlite3
 from formsubmission import RegistrationForm
@@ -12,6 +12,47 @@ app.secret_key = "__privatekey__"
 @app.route('/') # home page
 def Home():
     return render_template('home.html')
+
+# ————————————————————————————————————————– GET ANCHOR DATA —————————————————————————————————————————
+
+ANCHOR_FILE = "anchors.json"  # JSON file to store anchor data
+
+# Load existing anchors from file, create an empty list if file doesn't exist
+try:
+    with open(ANCHOR_FILE, "r") as f:
+        anchors = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    anchors = []
+
+@app.route('/upload', methods=['POST'])
+def receive_location():
+    try:
+        data = request.get_json()
+        if not data or 'latitude' not in data or 'longitude' not in data:
+            return jsonify({"error": "Invalid data"}), 400
+        
+        # Extract data and add a default position if missing
+        anchor = {
+            "id": data["id"],
+            "name": data.get("name", f"Anchor {data['id']}"),
+            "latitude": data["latitude"],
+            "longitude": data["longitude"],
+            "positionX": data.get("positionX", -1),     # Not sure if we have UWB coordinates yet, default to -1
+            "positionY": data.get("positionY", -1)      # Not sure if we have UWB coordinates yet, default to -1
+        }
+
+        # Append new anchor to the list
+        anchors.append(anchor)
+
+        # Save to JSON file
+        with open(ANCHOR_FILE, "w") as f:
+            json.dump(anchors, f, indent=4)
+
+        return jsonify({"message": "Anchor saved!", "anchor": anchor}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 #LOGIN PAGE
 @app.route('/login', methods=['POST','GET'])
@@ -244,7 +285,7 @@ def logout():
 
     
 if __name__ =="__main__":
-    app.run(debug=True)
+    app.run(debug=True, host="0.0.0.0", port=5000)
     
 
 
