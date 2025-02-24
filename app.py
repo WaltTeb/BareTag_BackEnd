@@ -18,8 +18,8 @@ def Home():
 @app.route('/login', methods=['POST','GET'])
 def login():
     if request.method == 'POST':
-        userName = request.form['username']
-        passWord = request.form['password']
+        userName = request.get_json()['username']
+        passWord = request.get_json()['password']
         con = sqlite3.connect('users.db')
         c = con.cursor()
         c.execute("SELECT * FROM profiles WHERE name=?", (userName,))  # Updated to match profiles table column
@@ -35,9 +35,6 @@ def login():
             session['user_id'] = user[0]  # store user id in session
             session['user_name'] = userName  # store user name in session
             return jsonify({'message': 'Login successful', 'user_id': user[0], 'user_name': userName}), 200
-    
-    else:
-        return render_template('login.html')
 
 
 # REGISTRATION PAGE
