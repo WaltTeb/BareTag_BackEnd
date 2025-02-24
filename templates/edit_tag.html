@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Tag</title>
+</head>
+<body>
+    <h1>Edit Tag</h1>
+
+    <!-- Tag Edit Form -->
+    <form action="{{ url_for('edit_tag', tag_id=tag[0], user_id=user_id, name=name) }}" method="POST">
+        <label for="tag_name">Tag Name:</label>
+        <input type="text" name="tag_name" id="tag_name" value="{{ tag[2] }}" required><br>
+
+        <label for="latitude">Latitude:</label>
+        <input type="text" name="latitude" id="latitude" value="{{ tag[3] }}" required><br>
+
+        <label for="longitude">Longitude:</label>
+        <input type="text" name="longitude" id="longitude" value="{{ tag[4] }}" required><br>
+
+        <button type="submit">Update Tag</button>
+    </form>
+
+    <br>
+    <a href="{{ url_for('dashboard', user_id=user_id, name=name) }}">Back to Dashboard</a>
+</body>
+</html>

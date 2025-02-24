@@ -14,12 +14,13 @@ import sqlite3
 con = sqlite3.connect('users.db')
 
 # creates table to store users
-con.execute("CREATE TABLE profiles(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, password TEXT, phoneNumber TEXT, email TEXT)") 
+con.execute("CREATE TABLE IF NOT EXISTS profiles(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, password TEXT, phoneNumber TEXT, email TEXT)") 
 
 # creates table to store anchors to associate with users
-con.execute("CREATE TABLE anchors (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, anchor_name TEXT, latitude REAL, longitude REAL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(user_id) REFERENCES profiles(id))")
+con.execute("CREATE TABLE IF NOT EXISTS anchors (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, anchor_name TEXT, latitude REAL, longitude REAL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(user_id) REFERENCES profiles(id))")
 
-con.execute("CREATE TABLE tags (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, tag_name TEXT, latitude REAL, longitude REAL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(user_id) REFERENCES profiles(id))")
+con.execute("CREATE TABLE IF NOT EXISTS tags (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, tag_name TEXT, latitude REAL, longitude REAL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(user_id) REFERENCES profiles(id))")
 
+con.execute("CREATE TABLE IF NOT EXISTS tag_locations (id INTEGER PRIMARY KEY AUTOINCREMENT, tag_id INTEGER, latitude REAL, longitude REAL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (tag_id) REFERENCES tags(id))")
 
 con.close()

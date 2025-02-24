@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='custom.css') }}">
+    <title>Dashboard</title>
+</head>
+<body>
+    <h1>Welcome {{ name }}'s Dashboard</h1>
+
+    <!-- Anchor Form to Add New Anchor -->
+    <h3>Add New Anchor</h3>
+    <form action="{{ url_for('dashboard', user_id=user_id, name=name) }}" method="POST">
+        <label for="anchor_name">Anchor Name:</label>
+        <input type="text" name="anchor_name" id="anchor_name" required><br>
+        <label for="latitude">Latitude:</label>
+        <input type="text" name="latitude" id="latitude" required><br>
+        <label for="longitude">Longitude:</label>
+        <input type="text" name="longitude" id="longitude" required><br>
+        <button type="submit">Add Anchor</button>
+    </form>
+
+    <!-- Tag Form to Add New Tag -->
+    <h3>Add New Tag</h3>
+    <form action="{{ url_for('dashboard', user_id=user_id, name=name) }}" method="POST">
+        <label for="tag_name">Tag Name:</label>
+        <input type="text" name="tag_name" id="tag_name" required><br>
+        <label for="tag_latitude">Latitude:</label>
+        <input type="text" name="tag_latitude" id="tag_latitude" required><br>
+        <label for="tag_longitude">Longitude:</label>
+        <input type="text" name="tag_longitude" id="tag_longitude" required><br>
+        <button type="submit">Add Tag</button>
+    </form>
+
+    <!-- Table to Display Anchors -->
+    <h3>Your Anchors</h3>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Anchor ID</th>
+                <th>Anchor Name</th>
+                <th>Latitude</th>
+                <th>Longitude</th>
+                <th>Date Created</th>
+                <th>Actions</th> <!-- Added Actions column -->
+            </tr>
+        </thead>
+        <tbody>
+            {% for anchor in anchors %}
+            <tr>
+                <td>{{ anchor[0] }}</td>
+                <td>{{ anchor[2] }}</td>
+                <td>{{ anchor[3] }}</td>
+                <td>{{ anchor[4] }}</td>
+                <td>{{ anchor[5] }}</td>
+                <td>
+                    <!-- Delete Button for Anchor -->
+                    <a href="{{ url_for('delete_anchor', anchor_id=anchor[0], user_id=user_id, name=name) }}">Delete</a>
+                    <!-- Edit Button (You can add the edit route as you did before) -->
+                    <a href="{{ url_for('edit_anchor', anchor_id=anchor[0], user_id=user_id, name=name) }}">Edit</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Table to Display Tags -->
+    <h3>Your Tags</h3>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Tag ID</th>
+                <th>Tag Name</th>
+                <th>Latitude</th>
+                <th>Longitude</th>
+                <th>Date Created</th>
+                <th>Actions</th> <!-- Added Actions column -->
+            </tr>
+        </thead>
+        <tbody>
+            {% for tag in tags %}
+            <tr>
+                <td>{{ tag[0] }}</td>
+                <td>{{ tag[2] }}</td>
+                <td>{{ tag[3] }}</td>
+                <td>{{ tag[4] }}</td>
+                <td>{{ tag[5] }}</td>
+                <td>
+                    <!-- Delete Button for Tag -->
+                    <a href="{{ url_for('delete_tag', tag_id=tag[0], user_id=user_id, name=name) }}">Delete</a>
+                    <!-- Edit Button (You can add the edit route as you did before) -->
+                    <a href="{{ url_for('edit_tag', tag_id=tag[0], user_id=user_id, name=name) }}">Edit</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <br>
+    <a href="{{ url_for('logout') }}">Logout</a>
+</body>
+</html>

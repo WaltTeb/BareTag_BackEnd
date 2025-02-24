@@ -4,6 +4,7 @@ import sqlite3
 from formsubmission import RegistrationForm
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 
 
 app = Flask(__name__)
@@ -13,69 +14,29 @@ app.secret_key = "__privatekey__"
 def Home():
     return render_template('home.html')
 
-# ————————————————————————————————————————– GET ANCHOR DATA —————————————————————————————————————————
-
-ANCHOR_FILE = "anchors.json"  # JSON file to store anchor data
-
-# Load existing anchors from file, create an empty list if file doesn't exist
-try:
-    with open(ANCHOR_FILE, "r") as f:
-        anchors = json.load(f)
-except (FileNotFoundError, json.JSONDecodeError):
-    anchors = []
-
-@app.route('/upload', methods=['POST'])
-def receive_location():
-    try:
-        data = request.get_json()
-        if not data or 'latitude' not in data or 'longitude' not in data:
-            return jsonify({"error": "Invalid data"}), 400
-        
-        # Extract data and add a default position if missing
-        anchor = {
-            "timestamp": data["timestamp"],
-            "id": data["id"],
-            "name": data.get("name", f"Anchor {data['id']}"),
-            "latitude": data["latitude"],
-            "longitude": data["longitude"],
-            "positionX": data.get("positionX", -1),     # Not sure if we have UWB coordinates yet, default to -1
-            "positionY": data.get("positionY", -1)      # Not sure if we have UWB coordinates yet, default to -1
-        }
-
-        # Append new anchor to the list
-        anchors.append(anchor)
-
-        # Save to JSON file
-        with open(ANCHOR_FILE, "w") as f:
-            json.dump(anchors, f, indent=4)
-
-        return jsonify({"message": "Anchor saved!", "anchor": anchor}), 200
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-#LOGIN PAGE
+# LOGIN PAGE
 @app.route('/login', methods=['POST','GET'])
 def login():
     if request.method == 'POST':
-        userName = request.form['name']
-        passWord = request.form['passWord']
+        userName = request.form['username']
+        passWord = request.form['password']
         con = sqlite3.connect('users.db')
         c = con.cursor()
-        c.execute("SELECT * FROM profiles WHERE name=?", (userName,)) # grabs the user with this username and login
+        c.execute("SELECT * FROM profiles WHERE name=?", (userName,))  # Updated to match profiles table column
         user = c.fetchone()
         con.close()
         
         if user is None or not check_password_hash(user[2], passWord):  # not a valid user
-            return render_template('login.html', error="Invalid Credentials!")
-        else: # valid user bring them to their dashboard
-            session['user_id'] = user[0] # store user id in session
-            session['user_name'] = userName # store user name in session
-            return redirect(url_for('dashboard', user_id=user[0], name=userName))
+            return jsonify({'error': 'Invalid credentials, please check your username and password'}), 401
+
+
+        else:  # valid user bring them to their dashboard
+
+            session['user_id'] = user[0]  # store user id in session
+            session['user_name'] = userName  # store user name in session
+            return jsonify({'message': 'Login successful', 'user_id': user[0], 'user_name': userName}), 200
     
     else:
-        request.method == 'GET'
         return render_template('login.html')
 
 
@@ -120,7 +81,7 @@ def registrationform():
         return render_template('register.html', form=registrationForm)
 
 
-# Function to use to Add an Anchor to a User's Dashboard
+# Function to Add an Anchor to a User's Dashboard
 def add_anchor(user_id, anchor_name, latitude, longitude):
     con = sqlite3.connect('users.db')
     c = con.cursor()
@@ -137,6 +98,81 @@ def add_tag(user_id, tag_name, latitude, longitude):
               VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""", (user_id, tag_name, latitude, longitude))
     con.commit()
     con.close()
+
+# FILE UPLOAD AND INSERT ANCHORS FROM JSON
+@app.route('/upload_anchors/<int:user_id>/<name>', methods=['POST'])
+def upload_anchors(user_id, name):
+    if 'file' not in request.files:
+        return redirect(request.url)
+    
+    file = request.files['file']
+    
+    if file.filename == '':
+        return redirect(request.url)
+    
+    if file and file.filename.endswith('.json'):
+        # Securely save the file
+        filename = secure_filename(file.filename)
+        file_path = f"{filename}"
+        file.save(file_path)
+
+        # Open and read the JSON file
+        with open(file_path, 'r') as json_file:
+            data = json.load(json_file)
+
+        # Insert the anchors into the database
+        con = sqlite3.connect('users.db')
+        c = con.cursor()
+
+        for anchor in data:
+            anchor_name = anchor['id']
+            latitude = anchor['latitude']
+            longitude = anchor['longitude']
+
+            # Insert anchor into the database for the user
+            try:
+                c.execute(""" 
+                    INSERT INTO anchors (user_id, anchor_name, latitude, longitude, created_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (user_id, anchor_name, latitude, longitude))
+            except Exception as e:
+                print(f"Error inserting anchor {anchor_name}: {e}")  # Debugging line, you can remove it later
+
+        con.commit()
+        con.close()
+
+        # Redirect back to the dashboard after uploading anchors
+        return redirect(url_for('dashboard', user_id=user_id, name=name))
+
+    else:
+        return "Invalid file format. Please upload a .json file."
+    
+@app.route('/receive_location', methods=['POST'])
+def receive_location():
+    # Extract data from incoming JSON payload
+    data = request.get_json()
+
+    tag_id = data.get('tag_id')
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+    timestamp = data.get('timestamp')
+    
+    # Check to make sure JSON had everything you need
+    if tag_id and latitude and longitude and timestamp:
+
+        # Insert received location into the 'tag_locations' table
+        con = sqlite3.connect('users.db')
+        c = con.cursor()
+        # Insert the received location data into the 'tag_locations' table
+        c.execute("""INSERT INTO tag_locations(tag_id, latitude, longitude, timestamp)
+                VALUES (?, ?, ?, ?)""", (tag_id, latitude, longitude, timestamp))
+        con.commit()
+        con.close()
+
+        return 'Successfully saved', 200 # Successful return message code
+    else:
+        return 'Error', 400
+    
 
 
 # Dashboard PAGE (User Profile + Anchors + Tags)
@@ -160,7 +196,7 @@ def dashboard(user_id, name):
             if tag_name:
                 add_tag(user_id, tag_name, latitude, longitude)
 
-        # Fetch the user's anchor
+        # Fetch the user's anchors
         con = sqlite3.connect('users.db')
         c = con.cursor()
         c.execute("SELECT * FROM anchors WHERE user_id=?", (user_id,))
@@ -168,13 +204,13 @@ def dashboard(user_id, name):
 
         # Fetch the user's tags
         c.execute("SELECT * FROM tags WHERE user_id=?", (user_id,))
-        tags = c.fetchall() # Fetch updated tags list
+        tags = c.fetchall()  # Fetch updated tags list
         con.close()
 
         return render_template('dashboard.html', name=name, anchors=anchors, tags=tags, user_id=user_id)
     
     # Handle GET request
-    else: # Fetch the user's anchors for the GET request
+    else:  # Fetch the user's anchors for the GET request
         con = sqlite3.connect('users.db')
         c = con.cursor()
         c.execute("SELECT* FROM anchors WHERE user_id=?", (user_id,))
@@ -193,7 +229,7 @@ def edit_anchor(anchor_id, user_id, name):
     c = con.cursor()
 
     # Fetch the anchor's current details
-    c.execute("SELECT * FROM anchors WHERE id=?", (anchor_id,))
+    c.execute("SELECT * FROM anchors WHERE anchor_id=?", (anchor_id,))
     anchor = c.fetchone()
     
     # Handle the POST request to update the anchor
@@ -205,7 +241,7 @@ def edit_anchor(anchor_id, user_id, name):
 
         # Update anchor in the database
         c.execute("""UPDATE anchors SET anchor_name = ?, latitude = ?, longitude = ?, created_at = ?
-            WHERE id = ?""", (new_name, new_latitude, new_longitude, last_updated, anchor_id))
+            WHERE anchor_id = ?""", (new_name, new_latitude, new_longitude, last_updated, anchor_id))
         con.commit()
         con.close()
 
@@ -224,7 +260,7 @@ def edit_tag(tag_id, user_id, name):
     c = con.cursor()
 
     # Fetch the tag's current details
-    c.execute("SELECT * FROM tags WHERE id=?", (tag_id,))
+    c.execute("SELECT * FROM tags WHERE tag_id=?", (tag_id,))
     tag = c.fetchone()
 
     # Handle the POST request to update the tag
@@ -236,7 +272,7 @@ def edit_tag(tag_id, user_id, name):
 
         # Update tag in the database
         c.execute("""UPDATE tags SET tag_name = ?, latitude = ?, longitude = ?, created_at = ? 
-                     WHERE id = ?""", (new_name, new_latitude, new_longitude, last_updated, tag_id))
+                     WHERE tag_id = ?""", (new_name, new_latitude, new_longitude, last_updated, tag_id))
         con.commit()
         con.close()
 
@@ -255,7 +291,7 @@ def delete_anchor(anchor_id, user_id, name):
     con = sqlite3.connect('users.db')
     c = con.cursor()
 
-    c.execute("DELETE FROM anchors where id=?", (anchor_id,))
+    c.execute("DELETE FROM anchors WHERE anchor_id=?", (anchor_id,))
     con.commit()
     con.close()
 
@@ -269,25 +305,20 @@ def delete_tag(tag_id, user_id, name):
     c = con.cursor()
 
     # Delete Tag
-    c.execute("DELETE FROM tags WHERE id=?", (tag_id,))
+    c.execute("DELETE FROM tags WHERE tag_id=?", (tag_id,))
     con.commit()
     con.close()
 
     # Redirect back to dashboard
     return redirect(url_for('dashboard', user_id=user_id, name=name))
-     
-    
+
 # LOGOUT PAGE
 @app.route('/logout')
 def logout():
-    # Clear the session data (if you're using session for tracking login)
+    # Clear the session data
     session.clear()
     return redirect(url_for('login'))
 
-    
-if __name__ =="__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
-    
 
-
-
+if __name__ == "__main__":
+    app.run(debug=True)
