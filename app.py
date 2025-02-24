@@ -27,7 +27,7 @@ def login():
         con.close()
         
         if user is None or not check_password_hash(user[2], passWord):  # not a valid user
-            return jsonify({'error': 'Invalid credentials, please check your username and password'}), 401
+            return jsonify({'error': 'Invalid credentials'}), 401
 
 
         else:  # valid user bring them to their dashboard
@@ -38,44 +38,45 @@ def login():
 
 
 # REGISTRATION PAGE
-@app.route('/registrationform', methods = ['POST', 'GET'])
-def registrationform():
-    registrationForm = RegistrationForm()
-    con = sqlite3.connect('users.db')
-    c = con.cursor()
+@app.route('/registration', methods=['POST'])
+def registration():
+    try:
+        # Get data from the incoming JSON request
+        data = request.get_json()
+
+        # Get the fields from the JSON data
+        userName = data['username']
+        passWord = data['password']
+        phoneNumber = data['phoneNumber']
+        email = data['email']
+
+        # Hash the password
+        hashed_password = generate_password_hash(passWord)
+
+        # Check if the user already exists
+        con = sqlite3.connect('users.db')
+        c = con.cursor()
+        c.execute("SELECT * FROM profiles WHERE name=?", (userName,))
+        existing_user = c.fetchone()
+
+        if existing_user:
+            # If the user already exists, return an error message
+            con.close()
+            return jsonify({'error': 'User already exists. Please try a new username.'}), 409
+        
+        # If the user does not exist, proceed with registration
+        c.execute("INSERT INTO profiles (name, passWord, phoneNumber, email) VALUES (?, ?, ?, ?)",
+                  (userName, hashed_password, phoneNumber, email))
+        con.commit()
+        con.close()
+
+        # Return success message after registration
+        return jsonify({'message': 'Registration successful, you can now log in.'}), 201
     
-    if request.method == 'POST':
-        if (request.form["name"]!="" and request.form["passWord"]!=""):
-            name = request.form["name"]
-            passWord = request.form["passWord"]
-            phoneNumber = request.form["phoneNumber"]
-            email = request.form["email"]
+    except Exception as e:
+        # Catch any unexpected errors and return a response
+        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
 
-            # Hash the Password
-            hashed_password = generate_password_hash(passWord)
-
-            # Check if the user already exists
-            statement = f"SELECT * from profiles WHERE name='{name}';"
-            c.execute(statement)
-            data = c.fetchone()
-            
-            if data:   # If user exists, show error message but do not continue with registration
-                return render_template("error.html", error="User Already Exists! Please try a new username.")
-            
-            else:
-                # Insert new user if they do not exist
-                c.execute("INSERT INTO profiles (name,passWord, phoneNumber, email) VALUES (?,?,?,?)", (name, hashed_password, phoneNumber, email))
-                con.commit()
-                con.close()
-
-                # Clear session before redirecting to login
-                session.clear()
-
-                # After registration, go to login
-                return redirect(url_for('login'))  
-
-    elif request.method == 'GET':
-        return render_template('register.html', form=registrationForm)
 
 
 # Function to Add an Anchor to a User's Dashboard
