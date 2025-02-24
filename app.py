@@ -79,14 +79,37 @@ def registration():
 
 
 
-# Function to Add an Anchor to a User's Dashboard
-def add_anchor(user_id, anchor_name, latitude, longitude):
-    con = sqlite3.connect('users.db')
-    c = con.cursor()
-    c.execute("""INSERT INTO anchors (user_id, anchor_name, latitude, longitude, created_at)
-              VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""", (user_id, anchor_name, latitude, longitude))
-    con.commit()
-    con.close()
+@app.route('/add_anchor', methods=['POST'])
+def add_anchor_to_dashboard():
+    # Extract data from the incoming JSON payload
+    data = request.get_json()
+
+    # Extract individual data fields from the received JSON
+    anchor_id = data.get('anchor_id')
+    anchor_name = data.get('anchor_name')
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+
+    # Check if all required data was received
+    if anchor_id and anchor_name and latitude and longitude:
+        try:
+            # Insert the received anchor data into the 'anchors' table
+            con = sqlite3.connect('users.db')
+            c = con.cursor()
+            c.execute("""INSERT INTO anchors (user_id, anchor_name, latitude, longitude, created_at) 
+                         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+                      (anchor_id, anchor_name, latitude, longitude))
+            con.commit()
+            con.close()
+
+            # Return a success response to the frontend
+            return jsonify({'message': 'Anchor successfully added to dashboard!'}), 201
+        except Exception as e:
+            # In case of an error, return an error response
+            return jsonify({'error': f'Error occurred while adding anchor: {str(e)}'}), 500
+    else:
+        # If any of the required fields are missing, return a bad request error
+        return jsonify({'error': 'Missing data (anchor_id, anchor_name, latitude, or longitude)'}), 400
 
 # Function to Add a Tag to a User's Dashboard
 def add_tag(user_id, tag_name, latitude, longitude):
@@ -96,81 +119,6 @@ def add_tag(user_id, tag_name, latitude, longitude):
               VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""", (user_id, tag_name, latitude, longitude))
     con.commit()
     con.close()
-
-# FILE UPLOAD AND INSERT ANCHORS FROM JSON
-@app.route('/upload_anchors/<int:user_id>/<name>', methods=['POST'])
-def upload_anchors(user_id, name):
-    if 'file' not in request.files:
-        return redirect(request.url)
-    
-    file = request.files['file']
-    
-    if file.filename == '':
-        return redirect(request.url)
-    
-    if file and file.filename.endswith('.json'):
-        # Securely save the file
-        filename = secure_filename(file.filename)
-        file_path = f"{filename}"
-        file.save(file_path)
-
-        # Open and read the JSON file
-        with open(file_path, 'r') as json_file:
-            data = json.load(json_file)
-
-        # Insert the anchors into the database
-        con = sqlite3.connect('users.db')
-        c = con.cursor()
-
-        for anchor in data:
-            anchor_name = anchor['id']
-            latitude = anchor['latitude']
-            longitude = anchor['longitude']
-
-            # Insert anchor into the database for the user
-            try:
-                c.execute(""" 
-                    INSERT INTO anchors (user_id, anchor_name, latitude, longitude, created_at)
-                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, (user_id, anchor_name, latitude, longitude))
-            except Exception as e:
-                print(f"Error inserting anchor {anchor_name}: {e}")  # Debugging line, you can remove it later
-
-        con.commit()
-        con.close()
-
-        # Redirect back to the dashboard after uploading anchors
-        return redirect(url_for('dashboard', user_id=user_id, name=name))
-
-    else:
-        return "Invalid file format. Please upload a .json file."
-    
-@app.route('/receive_location', methods=['POST'])
-def receive_location():
-    # Extract data from incoming JSON payload
-    data = request.get_json()
-
-    tag_id = data.get('tag_id')
-    latitude = data.get('latitude')
-    longitude = data.get('longitude')
-    timestamp = data.get('timestamp')
-    
-    # Check to make sure JSON had everything you need
-    if tag_id and latitude and longitude and timestamp:
-
-        # Insert received location into the 'tag_locations' table
-        con = sqlite3.connect('users.db')
-        c = con.cursor()
-        # Insert the received location data into the 'tag_locations' table
-        c.execute("""INSERT INTO tag_locations(tag_id, latitude, longitude, timestamp)
-                VALUES (?, ?, ?, ?)""", (tag_id, latitude, longitude, timestamp))
-        con.commit()
-        con.close()
-
-        return 'Successfully saved', 200 # Successful return message code
-    else:
-        return 'Error', 400
-    
 
 
 # Dashboard PAGE (User Profile + Anchors + Tags)
@@ -319,4 +267,4 @@ def logout():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, host="0.0.0.0", port=5000)
