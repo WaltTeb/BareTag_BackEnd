@@ -33,6 +33,7 @@ def receive_location():
         
         # Extract data and add a default position if missing
         anchor = {
+            "timestamp": data["timestamp"],
             "id": data["id"],
             "name": data.get("name", f"Anchor {data['id']}"),
             "latitude": data["latitude"],
