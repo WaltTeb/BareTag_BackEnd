@@ -5,6 +5,7 @@ from formsubmission import RegistrationForm
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+import math
 
 
 app = Flask(__name__)
@@ -84,21 +85,25 @@ def add_anchor_to_dashboard():
     # Extract data from the incoming JSON payload
     data = request.get_json()
 
+    # Get user_id from session (user is logged in)
+    user_id = session.get('user_id')
+    if user_id is None:
+        return jsonify({'error': 'User not logged in'}), 401  # Unauthorized if no user is logged in
+
     # Extract individual data fields from the received JSON
-    anchor_id = data.get('anchor_id')
     anchor_name = data.get('anchor_name')
     latitude = data.get('latitude')
     longitude = data.get('longitude')
 
     # Check if all required data was received
-    if anchor_id and anchor_name and latitude and longitude:
+    if anchor_name and latitude and longitude:
         try:
             # Insert the received anchor data into the 'anchors' table
             con = sqlite3.connect('users.db')
             c = con.cursor()
             c.execute("""INSERT INTO anchors (user_id, anchor_name, latitude, longitude, created_at) 
                          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""",
-                      (anchor_id, anchor_name, latitude, longitude))
+                      (user_id, anchor_name, latitude, longitude))
             con.commit()
             con.close()
 
@@ -111,152 +116,334 @@ def add_anchor_to_dashboard():
         # If any of the required fields are missing, return a bad request error
         return jsonify({'error': 'Missing data (anchor_id, anchor_name, latitude, or longitude)'}), 400
 
-# Function to Add a Tag to a User's Dashboard
-def add_tag(user_id, tag_name, latitude, longitude):
-    con = sqlite3.connect('users.db')
-    c = con.cursor()
-    c.execute("""INSERT INTO tags (user_id, tag_name, latitude, longitude, created_at) 
-              VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""", (user_id, tag_name, latitude, longitude))
-    con.commit()
-    con.close()
-
-
-# Dashboard PAGE (User Profile + Anchors + Tags)
-@app.route('/dashboard/<int:user_id>/<name>', methods = ['GET', 'POST'])
-def dashboard(user_id, name):
-    # Handle POST request
-    if request.method == 'POST':
-        # Add new anchor to the user's profile
-        if 'anchor_name' in request.form:
-            anchor_name = request.form['anchor_name']
-            latitude = request.form['latitude']
-            longitude = request.form['longitude']
-            if anchor_name:
-                add_anchor(user_id, anchor_name, latitude, longitude)
-        
-        # Add new tag to the user's profile
-        if 'tag_name' in request.form:
-            tag_name = request.form['tag_name']
-            latitude = request.form['tag_latitude']
-            longitude = request.form['tag_longitude']
-            if tag_name:
-                add_tag(user_id, tag_name, latitude, longitude)
-
-        # Fetch the user's anchors
-        con = sqlite3.connect('users.db')
-        c = con.cursor()
-        c.execute("SELECT * FROM anchors WHERE user_id=?", (user_id,))
-        anchors = c.fetchall()
-
-        # Fetch the user's tags
-        c.execute("SELECT * FROM tags WHERE user_id=?", (user_id,))
-        tags = c.fetchall()  # Fetch updated tags list
-        con.close()
-
-        return render_template('dashboard.html', name=name, anchors=anchors, tags=tags, user_id=user_id)
-    
-    # Handle GET request
-    else:  # Fetch the user's anchors for the GET request
-        con = sqlite3.connect('users.db')
-        c = con.cursor()
-        c.execute("SELECT* FROM anchors WHERE user_id=?", (user_id,))
-        anchors = c.fetchall()
-
-        c.execute("SELECT * FROM tags WHERE user_id=?", (user_id,))
-        tags = c.fetchall()
-        con.close()
-        
-        return render_template('dashboard.html', name=name, anchors=anchors, tags=tags, user_id=user_id)
-    
 # EDIT ANCHOR PAGE
-@app.route('/edit_anchor/<int:anchor_id>/<int:user_id>/<name>', methods=['GET', 'POST'])
-def edit_anchor(anchor_id, user_id, name):
-    con = sqlite3.connect('users.db')
-    c = con.cursor()
+@app.route('/edit_anchor', methods=['POST'])
+def edit_anchor():
+    # Get user_id from the session
+    user_id = session.get('user_id')
 
-    # Fetch the anchor's current details
-    c.execute("SELECT * FROM anchors WHERE anchor_id=?", (anchor_id,))
-    anchor = c.fetchone()
+    if user_id is None:
+        return jsonify({'error': 'User not logged in'}), 401 # Unauthorized no user logged in
     
-    # Handle the POST request to update the anchor
-    if request.method == 'POST':
-        new_name = request.form['anchor_name']
-        new_latitude = request.form['latitude']
-        new_longitude = request.form['longitude']
-        last_updated = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        # Update anchor in the database
-        c.execute("""UPDATE anchors SET anchor_name = ?, latitude = ?, longitude = ?, created_at = ?
-            WHERE anchor_id = ?""", (new_name, new_latitude, new_longitude, last_updated, anchor_id))
-        con.commit()
-        con.close()
+    # Extract data from incoming frontend payload
+    data = request.get_json()
+    anchor_name = data.get('anchor_name')
+    new_name = data.get('new_anchor_name')
+    new_latitude = data.get('latitude')
+    new_longitude = data.get('longitude')
 
-        # Redirect back to the dashboard after updating
-        return redirect(url_for('dashboard', user_id=user_id, name=name))
+    # Ensure we got everything needed
+    if anchor_name and new_name and new_latitude and new_longitude:
+        try:
+            # Connect to db
+            con = sqlite3.connect('users.db')
+            c = con.cursor()
 
-    # Handle the GET request
+            # Fetch the anchor's current details
+            c.execute("SELECT * FROM anchors WHERE anchor_name=? and user_id=?", (anchor_name, user_id))
+            anchor = c.fetchone()
+
+            if anchor:  # make sure its a valid in 
+                # Update anchor in the database
+                c.execute("""UPDATE anchors SET anchor_name = ?, latitude = ?, longitude = ?, created_at = CURRENT_TIMESTAMP
+                    WHERE anchor_name = ? and user_id = ?""", (new_name, new_latitude, new_longitude, anchor_name, user_id))
+                con.commit()
+                con.close()
+                return jsonify({'message': 'Anchor updated successfully'}), 200
+            else:
+                return jsonify({'error': 'Anchor not found or not authorized to edit'}), 404
+        except Exception as e:
+            return jsonify({'error': f'Error occurred while updating anchor: {str(e)}'}), 500
     else:
-        con.close()
-        return render_template('edit_anchor.html', anchor=anchor, user_id=user_id, name=name)
+        return jsonify({'error': 'Missing data for anchor update'}), 400
+
+# DELETE ANCHOR ROUTE
+@app.route('/delete_anchor', methods=['POST'])
+def delete_anchor():
+    # Get user_id from session (assuming the user is logged in)
+    user_id = session.get('user_id')
+
+    if user_id is None:
+        return jsonify({'error': 'User not logged in'}), 401  # Unauthorized if no user is logged in
+
+    # Extract data from incoming JSON request
+    data = request.get_json()
+
+    # Extract the anchor_id from the request
+    anchor_id = data.get('anchor_id')
+
+    # Ensure that the anchor_id is provided
+    if anchor_id:
+        try:
+            # Connect to the database
+            con = sqlite3.connect('users.db')
+            c = con.cursor()
+
+            # Fetch the anchor's current details from the 'anchors' table
+            c.execute("SELECT * FROM anchors WHERE anchor_id=?", (anchor_id,))
+            anchor = c.fetchone()
+
+            if not anchor:
+                return jsonify({'error': 'Anchor not found'}), 404  # If anchor does not exist, return an error
+
+            # Check if the user owns the anchor (based on user_id)
+            if anchor[1] != user_id:  # Assuming 'user_id' is at index 1 in the fetched anchor tuple
+                return jsonify({'error': 'You do not have permission to delete this anchor'}), 403  # Forbidden
+
+            # Delete the anchor from the database
+            c.execute("DELETE FROM anchors WHERE anchor_id=?", (anchor_id,))
+            con.commit()
+            con.close()
+
+            # Return success response
+            return jsonify({'message': 'Anchor successfully deleted'}), 200
+
+        except Exception as e:
+            # Handle any errors
+            return jsonify({'error': f'Error occurred while deleting anchor: {str(e)}'}), 500
+
+    else:
+        return jsonify({'error': 'Missing anchor_id'}), 400  # Bad request if no anchor_id is provided
+
+
+
+# NEED KEN TO SEND TAG INFO WITH TAG NAME, LATITUDE, and LONGITUDE
+# Very SIMILAR TO ADDING AN ANCHOR
+
+@app.route('/add_tag', methods=['POST'])
+def add_tag():
+    # Get user_id from session
+    user_id = session.get('user_id')
+
+    if user_id is None:
+        return jsonify({'error': 'User not logged in'}), 401  # No user logged in
+
+    # Extract data from incoming JSON request
+    data = request.get_json()
+
+    # Extract tag details
+    tag_name = data.get('tag_name')
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+
+    # Check if required fields are provided
+    if tag_name and latitude is not None and longitude is not None:
+        try:
+            # Connect to the database
+            con = sqlite3.connect('users.db')
+            c = con.cursor()
+
+            # Insert the tag into the 'tags' table
+            c.execute("""INSERT INTO tags (user_id, tag_name, created_at)
+                         VALUES (?, ?, CURRENT_TIMESTAMP)""",
+                      (user_id, tag_name))
+            con.commit()
+
+            # Get the tag_id of the newly inserted tag (so we can insert it into tag_locations)
+            tag_id = c.lastrowid
+
+            # Set mode to default UWB for now, will figure out with logic
+            mode = 'UWB'
+
+            # Insert the location data (latitude, longitude, mode) into the 'tag_locations' table
+            c.execute("""INSERT INTO tag_locations (tag_id, latitude, longitude, mode, timestamp)
+                         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+                      (tag_id, latitude, longitude, mode))
+            con.commit()
+            con.close()
+
+            # Return success response
+            return jsonify({'message': 'Tag successfully added to dashboard'}), 201
+
+        except Exception as e:
+            # Handle any errors
+            return jsonify({'error': f'Error occurred while adding tag: {str(e)}'}), 500
+
+    else:
+        return jsonify({'error': 'Missing data (tag_name, latitude, longitude)'}), 400
+
 
 # EDIT TAG PAGE
-@app.route('/edit_tag/<int:tag_id>/<int:user_id>/<name>', methods=['GET', 'POST'])
-def edit_tag(tag_id, user_id, name):
-    con = sqlite3.connect('users.db')
-    c = con.cursor()
+@app.route('/edit_tag', methods=['POST'])
+def edit_tag():
+    # Get user_id from session (assuming user is logged in)
+    user_id = session.get('user_id')
 
-    # Fetch the tag's current details
-    c.execute("SELECT * FROM tags WHERE tag_id=?", (tag_id,))
-    tag = c.fetchone()
+    if user_id is None:
+        return jsonify({'error': 'User not logged in'}), 401  # Unauthorized if no user is logged in
 
-    # Handle the POST request to update the tag
-    if request.method == 'POST':
-        new_name = request.form['tag_name']
-        new_latitude = request.form['latitude']
-        new_longitude = request.form['longitude']
-        last_updated = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    # Extract data from incoming JSON request
+    data = request.get_json()
 
-        # Update tag in the database
-        c.execute("""UPDATE tags SET tag_name = ?, latitude = ?, longitude = ?, created_at = ? 
-                     WHERE tag_id = ?""", (new_name, new_latitude, new_longitude, last_updated, tag_id))
+    # Extract tag details from the request
+    tag_id = data.get('tag_id')  # the ID of the tag to edit
+    new_tag_name = data.get('tag_name')  # new name for the tag
+    new_latitude = data.get('latitude')  # new latitude for the initial position
+    new_longitude = data.get('longitude')  # new longitude for the initial position
+
+
+    new_mode = data.get('mode', 'UWB')  # new mode (default to 'UWB' if not provided)
+
+    # Ensure that we have the required data
+    if tag_id and (new_tag_name or new_latitude is not None or new_longitude is not None):
+        try:
+            # Connect to the database
+            con = sqlite3.connect('users.db')
+            c = con.cursor()
+
+            # Fetch the tag's current details from the 'tags' table
+            c.execute("SELECT * FROM tags WHERE tag_id=?", (tag_id,))
+            tag = c.fetchone()
+
+            if not tag:
+                return jsonify({'error': 'Tag not found'}), 404  # If tag does not exist, return an error
+
+            # Update the tag's name
+            if new_tag_name:
+                c.execute("""UPDATE tags SET tag_name = ?, created_at = CURRENT_TIMESTAMP WHERE tag_id = ?""",
+                          (new_tag_name, tag_id))
+
+            # If new latitude and longitude are provided, update the tag's initial position
+            if new_latitude is not None and new_longitude is not None:
+                # We assume we're updating the initial position in the 'tag_locations' table
+                c.execute("""UPDATE tag_locations SET latitude = ?, longitude = ?, mode = ?, timestamp = CURRENT_TIMESTAMP
+                             WHERE tag_id = ?""", (new_latitude, new_longitude, new_mode, tag_id))
+
+            con.commit()
+            con.close()
+
+            # Return success response
+            return jsonify({'message': 'Tag successfully updated'}), 200
+
+        except Exception as e:
+            # Handle any errors
+            return jsonify({'error': f'Error occurred while updating tag: {str(e)}'}), 500
+
+    else:
+        return jsonify({'error': 'Missing required data (tag_id, tag_name, latitude, longitude)'}), 400
+
+# DELETE TAG PAGE
+@app.route('/delete_tag', methods=['POST'])
+def delete_tag():
+    # Get user_id from session (assuming the user is logged in)
+    user_id = session.get('user_id')
+
+    if user_id is None:
+        return jsonify({'error': 'User not logged in'}), 401  # Unauthorized if no user is logged in
+
+    # Extract data from incoming JSON request
+    data = request.get_json()
+
+    # Extract the tag_id from the request
+    tag_id = data.get('tag_id')
+
+    # Ensure that the tag_id is provided
+    if tag_id:
+        try:
+            # Connect to the database
+            con = sqlite3.connect('users.db')
+            c = con.cursor()
+
+            # Fetch the tag's current details from the 'tags' table
+            c.execute("SELECT * FROM tags WHERE tag_id=?", (tag_id,))
+            tag = c.fetchone()
+
+            if not tag:
+                return jsonify({'error': 'Tag not found'}), 404  # If tag does not exist, return an error
+
+            # Check if the user owns the tag (based on user_id)
+            if tag[1] != user_id:  # Assuming 'user_id' is at index 1 in the fetched tag tuple
+                return jsonify({'error': 'You do not have permission to delete this tag'}), 403  # Forbidden
+
+            # Delete related entries in 'tag_locations'
+            c.execute("DELETE FROM tag_locations WHERE tag_id=?", (tag_id,))
+
+            # Delete the tag from the database
+            c.execute("DELETE FROM tags WHERE tag_id=?", (tag_id,))
+            con.commit()
+            con.close()
+
+            # Return success response
+            return jsonify({'message': 'Tag successfully deleted'}), 200
+
+        except Exception as e:
+            # Handle any errors
+            return jsonify({'error': f'Error occurred while deleting tag: {str(e)}'}), 500
+
+    else:
+        return jsonify({'error': 'Missing tag_id'}), 400  # Bad request if no tag_id is provided
+
+# Function needed to find a tag's gps coordinates
+# Assumes the grid is in meters, and the location of the anchor is in lat, lon format
+def convert_to_gps(anchor_lat, anchor_lon, x_offset, y_offset):
+    # Earth radius in meters
+    R = 6371000  
+
+    # Convert latitude and longitude to radians
+    lat_rad = math.radians(anchor_lat)
+    lon_rad = math.radians(anchor_lon)
+
+    # Calculate new latitude and longitude based on the offsets (in meters)
+    new_lat = lat_rad + (y_offset / R)
+    new_lon = lon_rad + (x_offset / (R * math.cos(math.pi * lat_rad / 180)))
+
+    # Convert back to degrees
+    new_lat = math.degrees(new_lat)
+    new_lon = math.degrees(new_lon)
+
+    return new_lat, new_lon
+
+# ADD TAG LOCATION ROUTE
+@app.route('/add_tag_location', methods=['POST'])
+def add_tag_location():
+    # Get user_id from session
+    user_id = session.get('user_id')
+
+    if user_id is None:
+        return jsonify({'error': 'User not logged in'}), 401
+
+    # Get data from the request
+    data = request.get_json()
+    tag_id = data.get('tag_id')
+    anchor_id = data.get('anchor_id')
+    x_offset = data.get('x_offset')  # Relative position in meters on the X-axis
+    y_offset = data.get('y_offset')  # Relative position in meters on the Y-axis
+
+    if not tag_id or not anchor_id or x_offset is None or y_offset is None:
+        return jsonify({'error': 'Missing required data (tag_id, anchor_id, x_offset, y_offset)'}), 400
+
+    try:
+        # Connect to the database
+        con = sqlite3.connect('users.db')
+        c = con.cursor()
+
+        # Fetch the anchor's GPS coordinates
+        c.execute("SELECT latitude, longitude FROM anchors WHERE id=?", (anchor_id,))
+        anchor = c.fetchone()
+
+        if not anchor:
+            return jsonify({'error': 'Anchor not found'}), 404
+
+        anchor_lat = anchor[0]
+        anchor_lon = anchor[1]
+
+        # Calculate the tag's GPS coordinates based on the anchor's position
+        tag_lat, tag_lon = convert_to_gps(anchor_lat, anchor_lon, x_offset, y_offset)
+
+        # Insert the calculated location into the tag_locations table
+        c.execute("""INSERT INTO tag_locations (tag_id, latitude, longitude, mode, timestamp) 
+                     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""", 
+                  (tag_id, tag_lat, tag_lon, "UWB"))
         con.commit()
         con.close()
 
-        # Redirect back to the dashboard after updating
-        return redirect(url_for('dashboard', user_id=user_id, name=name))
+        return jsonify({'message': 'Tag location successfully added'}), 201
 
-    # Handle the GET request to display the edit form
-    else:
-        con.close()
-        return render_template('edit_tag.html', tag=tag, user_id=user_id, name=name)
+    except Exception as e:
+        return jsonify({'error': f'Error occurred while adding tag location: {str(e)}'}), 500
 
 
-# DELETE ANCHOR PAGE
-@app.route('/delete_anchor/<int:anchor_id>/<int:user_id>/<name>', methods=['GET','POST'])
-def delete_anchor(anchor_id, user_id, name):
-    con = sqlite3.connect('users.db')
-    c = con.cursor()
-
-    c.execute("DELETE FROM anchors WHERE anchor_id=?", (anchor_id,))
-    con.commit()
-    con.close()
-
-    # Redirect back to the dashboard after deletion
-    return redirect(url_for('dashboard', user_id=user_id, name=name))
-
-# DELETE TAG PAGE
-@app.route('/delete_tag/<int:tag_id>/<int:user_id>/<name>', methods=['GET', 'POST'])
-def delete_tag(tag_id, user_id, name):
-    con = sqlite3.connect('users.db')
-    c = con.cursor()
-
-    # Delete Tag
-    c.execute("DELETE FROM tags WHERE tag_id=?", (tag_id,))
-    con.commit()
-    con.close()
-
-    # Redirect back to dashboard
-    return redirect(url_for('dashboard', user_id=user_id, name=name))
 
 # LOGOUT PAGE
 @app.route('/logout')
