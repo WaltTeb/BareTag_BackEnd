@@ -206,32 +206,26 @@ def edit_anchor():
 # GET ANCHORS ROUTE
 @app.route('/get_anchors', methods=['GET'])
 def get_anchors():
+    # ✅ Get user_id from session
+    user_id = session.get('user_id')
+
+    if not user_id:
+        return jsonify({'error': 'User not logged in'}), 401
+
     try:
-        # Connect to SQLite database
         con = sqlite3.connect('users.db')
         cur = con.cursor()
 
-        # Fetch all anchors from the database
-        cur.execute("SELECT id, anchor_name, latitude, longitude FROM anchors")
-        anchors = cur.fetchall()
+        # ✅ Fetch anchors only for the logged-in user
+        cur.execute("SELECT id, anchor_name, latitude, longitude FROM anchors WHERE user_id=?", (user_id,))
+        anchors = [{"id": row[0], "name": row[1], "latitude": row[2], "longitude": row[3]} for row in cur.fetchall()]
+
         con.close()
-
-        # Convert data to JSON format
-        anchor_list = [
-            {
-                "id": str(row[0]),  # Convert ID to string
-                "name": row[1],     # Anchor name
-                "latitude": row[2], # Latitude
-                "longitude": row[3] # Longitude
-            }
-            for row in anchors
-        ]
-
-        # Return the anchor data as JSON
-        return jsonify({"anchors": anchor_list, "message": "Anchors fetched successfully"}), 200
+        return jsonify({"anchors": anchors, "message": "Anchors fetched successfully"})
 
     except Exception as e:
         return jsonify({"error": f"Error retrieving anchors: {str(e)}"}), 500
+
 
 # DELETE ANCHOR ROUTE
 @app.route('/delete_anchor', methods=['POST'])
