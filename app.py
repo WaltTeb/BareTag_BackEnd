@@ -6,36 +6,80 @@ from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import math
+from flask_session import Session  # ✅ Import Flask-Session
+from flask_cors import CORS
+
 
 
 app = Flask(__name__)
 app.secret_key = "__privatekey__"
 
+
+
 @app.route('/') # home page
 def Home():
     return render_template('home.html')
 
-# LOGIN PAGE
-@app.route('/login', methods=['POST','GET'])
+# ————————————————————————————————————————————————- SESSION ————————————————————————————————————————————————
+
+CORS(app, supports_credentials=True)  # ✅ Allow iOS to send session cookies
+
+# Configure Flask to use server-side sessions
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "filesystem"  # Use "filesystem" instead of default cookies
+Session(app)  # ✅ Initialize the session
+
+
+# CHECK USER SESSION
+@app.route('/session_check', methods=['GET'])
+def session_check():
+    user_id = session.get('user_id')
+    user_name = session.get('user_name')
+
+    if user_id:
+        return jsonify({"message": "User session active", "user_id": user_id, "user_name": user_name}), 200
+    else:
+        return jsonify({"error": "No active session"}), 401
+    
+
+# ——————————————————————————————————————————————— LOGIN & REGISTRATION ———————————————————————————————————————————————
+
+# LOGIN
+@app.route('/login', methods=['POST'])
 def login():
-    if request.method == 'POST':
-        userName = request.get_json()['username']
-        passWord = request.get_json()['password']
-        con = sqlite3.connect('users.db')
-        c = con.cursor()
-        c.execute("SELECT * FROM profiles WHERE name=?", (userName,))  # Updated to match profiles table column
-        user = c.fetchone()
-        con.close()
-        
-        if user is None or not check_password_hash(user[2], passWord):  # not a valid user
-            return jsonify({'error': 'Invalid credentials'}), 401
+    data = request.get_json()
+    username = data.get("username")
+    password = data.get("password")
+
+    con = sqlite3.connect('users.db')
+    cur = con.cursor()
+    cur.execute("SELECT * FROM profiles WHERE name=?", (username,))
+    user = cur.fetchone()
+    con.close()
+
+    if user is None or not check_password_hash(user[2], password):  
+        return jsonify({'error': 'Invalid credentials'}), 401
+
+    session['user_id'] = user[0]  # ✅ Store user_id in session
+    session['user_name'] = username  # ✅ Store username in session
+
+    print(f"🟢 Session Data: {session}")  # ✅ Debug: Print session contents
+    return jsonify({'message': 'Login successful', 'user_id': user[0], 'user_name': username}), 200
+
+# LOGOUT
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.clear()  # ✅ This removes all session data
+    return jsonify({"message": "Logout successful"}), 200
 
 
-        else:  # valid user bring them to their dashboard
 
-            session['user_id'] = user[0]  # store user id in session
-            session['user_name'] = userName  # store user name in session
-            return jsonify({'message': 'Login successful', 'user_id': user[0], 'user_name': userName}), 200
+# # LOGOUT PAGE
+# @app.route('/logout')
+# def logout():
+#     # Clear the session data
+#     session.clear()
+#     return redirect(url_for('login'))
 
 
 # REGISTRATION PAGE
@@ -78,8 +122,10 @@ def registration():
         # Catch any unexpected errors and return a response
         return jsonify({'error': f'An error occurred: {str(e)}'}), 500
 
+# —————————————————————————————————————————————————————— ANCHORS ——————————————————————————————————————————————————————
 
-
+# ADD ANCHOR ROUTE
+# ADD ANCHOR ROUTE
 @app.route('/add_anchor', methods=['POST'])
 def add_anchor_to_dashboard():
     # Extract data from the incoming JSON payload
@@ -105,16 +151,22 @@ def add_anchor_to_dashboard():
                          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""",
                       (user_id, anchor_name, latitude, longitude))
             con.commit()
+
+            # Get the ID of the newly inserted anchor
+            anchor_id = c.lastrowid  # This is the server-generated ID (integer)
+
             con.close()
 
-            # Return a success response to the frontend
-            return jsonify({'message': 'Anchor successfully added to dashboard!'}), 201
+            # Return a success response to the frontend with the server-generated ID
+            return jsonify({'message': 'Anchor successfully added to dashboard!', 'anchor_id': anchor_id}), 201
         except Exception as e:
             # In case of an error, return an error response
             return jsonify({'error': f'Error occurred while adding anchor: {str(e)}'}), 500
     else:
         # If any of the required fields are missing, return a bad request error
-        return jsonify({'error': 'Missing data (anchor_id, anchor_name, latitude, or longitude)'}), 400
+        return jsonify({'error': 'Missing data (anchor_name, latitude, or longitude)'}), 400
+
+
 
 # EDIT ANCHOR PAGE
 @app.route('/edit_anchor', methods=['POST'])
@@ -158,54 +210,97 @@ def edit_anchor():
     else:
         return jsonify({'error': 'Missing data for anchor update'}), 400
 
+
+# GET ANCHORS ROUTE
+@app.route('/get_anchors', methods=['GET'])
+def get_anchors():
+    try:
+        # ✅ Get user_id from session
+        user_id = session.get('user_id')
+
+        if not user_id:
+            return jsonify({'error': 'User not logged in'}), 401  # Unauthorized
+
+        # ✅ Connect to SQLite database
+        con = sqlite3.connect('users.db')
+        cur = con.cursor()
+
+        # ✅ Fetch only the anchors belonging to the logged-in user
+        cur.execute("SELECT id, anchor_name, latitude, longitude FROM anchors WHERE user_id=?", (user_id,))
+        anchors = cur.fetchall()
+        con.close()
+
+        # ✅ Convert data to JSON format
+        anchor_list = [
+            {
+                "id": str(row[0]),  # Convert ID to string
+                "name": row[1],     # Anchor name
+                "latitude": row[2], # Latitude
+                "longitude": row[3] # Longitude
+            }
+            for row in anchors
+        ]
+
+        return jsonify({"anchors": anchor_list, "message": "Anchors fetched successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Error retrieving anchors: {str(e)}"}), 500
+
+
+
 # DELETE ANCHOR ROUTE
 @app.route('/delete_anchor', methods=['POST'])
 def delete_anchor():
-    # Get user_id from session (assuming the user is logged in)
-    user_id = session.get('user_id')
+    try:
+        # Extract data from the incoming JSON payload
+        data = request.get_json()
+        anchor_name = data.get('anchor_name')  # Get anchor name from request
+        user_id = session.get('user_id')  # Get user_id from session
 
-    if user_id is None:
-        return jsonify({'error': 'User not logged in'}), 401  # Unauthorized if no user is logged in
+        print(f"🟢 Incoming Delete Request - Anchor Name: {anchor_name}, User ID: {user_id}")
 
-    # Extract data from incoming JSON request
-    data = request.get_json()
+        # Validate user session
+        if not user_id:
+            return jsonify({'error': 'User not logged in'}), 401
 
-    # Extract the anchor_id from the request
-    anchor_id = data.get('anchor_id')
+        # Validate anchor_name
+        if not anchor_name:
+            return jsonify({'error': 'Missing anchor name'}), 400
 
-    # Ensure that the anchor_id is provided
-    if anchor_id:
-        try:
-            # Connect to the database
-            con = sqlite3.connect('users.db')
-            c = con.cursor()
+        # Database connection
+        con = sqlite3.connect('users.db')
+        cur = con.cursor()
 
-            # Fetch the anchor's current details from the 'anchors' table
-            c.execute("SELECT * FROM anchors WHERE anchor_id=?", (anchor_id,))
-            anchor = c.fetchone()
+        # ✅ Check if the anchor exists for the given user_id and anchor_name
+        cur.execute("SELECT * FROM anchors WHERE user_id = ? AND anchor_name = ?", (user_id, anchor_name))
+        anchor = cur.fetchone()
 
-            if not anchor:
-                return jsonify({'error': 'Anchor not found'}), 404  # If anchor does not exist, return an error
+        if not anchor:
+            print(f"❌ No anchor found for User ID {user_id} and Anchor Name {anchor_name}")
+            return jsonify({'error': 'Anchor not found or unauthorized'}), 404
 
-            # Check if the user owns the anchor (based on user_id)
-            if anchor[1] != user_id:  # Assuming 'user_id' is at index 1 in the fetched anchor tuple
-                return jsonify({'error': 'You do not have permission to delete this anchor'}), 403  # Forbidden
+        # ✅ Delete the anchor
+        cur.execute("DELETE FROM anchors WHERE user_id = ? AND anchor_name = ?", (user_id, anchor_name))
+        con.commit()
+        con.close()
 
-            # Delete the anchor from the database
-            c.execute("DELETE FROM anchors WHERE anchor_id=?", (anchor_id,))
-            con.commit()
-            con.close()
+        print(f"✅ Successfully deleted Anchor for User ID: {user_id} and Anchor Name: {anchor_name}")
+        return jsonify({'message': 'Anchor deleted successfully'}), 200
 
-            # Return success response
-            return jsonify({'message': 'Anchor successfully deleted'}), 200
+    except Exception as e:
+        print(f"❌ Error deleting anchor: {str(e)}")
+        return jsonify({'error': f'Error deleting anchor: {str(e)}'}), 500
 
-        except Exception as e:
-            # Handle any errors
-            return jsonify({'error': f'Error occurred while deleting anchor: {str(e)}'}), 500
 
-    else:
-        return jsonify({'error': 'Missing anchor_id'}), 400  # Bad request if no anchor_id is provided
 
+
+
+
+
+
+
+
+# —————————————————————————————————————————————————————— TAGS ——————————————————————————————————————————————————————
 
 
 # NEED KEN TO SEND TAG INFO WITH TAG NAME, LATITUDE, and LONGITUDE
@@ -542,12 +637,7 @@ def get_tag_location_history():
 
 
 
-# LOGOUT PAGE
-@app.route('/logout')
-def logout():
-    # Clear the session data
-    session.clear()
-    return redirect(url_for('login'))
+
 
 
 if __name__ == "__main__":
