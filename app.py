@@ -260,12 +260,12 @@ def delete_anchor():
 
         # ✅ Convert `anchor_id` to INT if stored as INTEGER
         if isinstance(anchor_id, str) and anchor_id.isdigit():
-            anchor_id = int(anchor_id)
+            anchor_id = int(anchor_id)  
 
         con = sqlite3.connect('users.db')
         cur = con.cursor()
 
-        # ✅ Debug: Check if anchor exists in the database
+        # ✅ Check if the anchor exists before deleting
         cur.execute("SELECT * FROM anchors WHERE id=? AND user_id=?", (anchor_id, user_id))
         anchor = cur.fetchone()
 
@@ -284,6 +284,7 @@ def delete_anchor():
     except Exception as e:
         print(f"❌ Error deleting anchor: {str(e)}")
         return jsonify({'error': f'Error deleting anchor: {str(e)}'}), 500
+
 
 
 
