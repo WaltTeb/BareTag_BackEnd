@@ -168,7 +168,7 @@ def get_anchors():
         cur = con.cursor()
 
         # Fetch all anchors from the database
-        cur.execute("SELECT id, anchor_name, latitude, longitude, positionX, positionY FROM anchors")
+        cur.execute("SELECT id, anchor_name, latitude, longitude FROM anchors")
         anchors = cur.fetchall()
         con.close()
 
