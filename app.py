@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 import json
 import sqlite3
 from formsubmission import RegistrationForm
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import math
@@ -211,57 +211,75 @@ def delete_anchor():
 # NEED KEN TO SEND TAG INFO WITH TAG NAME, LATITUDE, and LONGITUDE
 # Very SIMILAR TO ADDING AN ANCHOR
 
-@app.route('/add_tag', methods=['POST'])
-def add_tag():
+@app.route('/add_tag_location', methods=['POST'])
+def add_tag_location():
     # Get user_id from session
     user_id = session.get('user_id')
 
     if user_id is None:
-        return jsonify({'error': 'User not logged in'}), 401  # No user logged in
+        return jsonify({'error': 'User not logged in'}), 401
 
-    # Extract data from incoming JSON request
+    # Get data from the request
     data = request.get_json()
+    tag_id = data.get('tag_id')
+    tag_name = data.get('tag_name') 
+    anchor_id = data.get('anchor_id')  # Anchor that is acting as the (0, 0)
+    x_offset = data.get('x_offset')  # Relative position in meters on the X-axis
+    y_offset = data.get('y_offset')  # Relative position in meters on the Y-axis
 
-    # Extract tag details
-    tag_name = data.get('tag_name')
-    latitude = data.get('latitude')
-    longitude = data.get('longitude')
+    if not tag_id or not anchor_id or x_offset is None or y_offset is None:
+        return jsonify({'error': 'Missing required data (tag_id, anchor_id, x_offset, y_offset)'}), 400
 
-    # Check if required fields are provided
-    if tag_name and latitude is not None and longitude is not None:
-        try:
-            # Connect to the database
-            con = sqlite3.connect('users.db')
-            c = con.cursor()
+    try:
+        # Connect to the database
+        con = sqlite3.connect('users.db')
+        c = con.cursor()
 
-            # Insert the tag into the 'tags' table
-            c.execute("""INSERT INTO tags (user_id, tag_name, created_at)
-                         VALUES (?, ?, CURRENT_TIMESTAMP)""",
-                      (user_id, tag_name))
-            con.commit()
+        # Check if the tag exists in the tags table
+        c.execute("SELECT tag_id FROM tags WHERE tag_id = ?", (tag_id,))
+        existing_tag = c.fetchone()
 
-            # Get the tag_id of the newly inserted tag (so we can insert it into tag_locations)
-            tag_id = c.lastrowid
+        if not existing_tag:
+            # If the tag doesn't exist, insert it into the tags table
+            c.execute("""
+                INSERT INTO tags (tag_id, tag_name, user_id, latitude, longitude)
+                VALUES (?, ?, ?, ?, ?)
+            """, (tag_id, tag_name, user_id, 0.0, 0.0))  # Default location set to 0.0, 0.0
 
-            # Set mode to default UWB for now, will figure out with logic
-            mode = 'UWB'
+        # Fetch the anchor's GPS coordinates
+        c.execute("SELECT latitude, longitude FROM anchors WHERE id=?", (anchor_id,))
+        anchor = c.fetchone()
 
-            # Insert the location data (latitude, longitude, mode) into the 'tag_locations' table
-            c.execute("""INSERT INTO tag_locations (tag_id, latitude, longitude, mode, timestamp)
-                         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""",
-                      (tag_id, latitude, longitude, mode))
-            con.commit()
-            con.close()
+        if not anchor:
+            return jsonify({'error': 'Anchor not found'}), 404
 
-            # Return success response
-            return jsonify({'message': 'Tag successfully added to dashboard'}), 201
+        anchor_lat = anchor[3]  # Longitude of the anchor
+        anchor_lon = anchor[4]  # Latitude of the anchor
 
-        except Exception as e:
-            # Handle any errors
-            return jsonify({'error': f'Error occurred while adding tag: {str(e)}'}), 500
+        # Calculate the tag's GPS coordinates based on the anchor's position
+        tag_lat, tag_lon = convert_to_gps(anchor_lat, anchor_lon, x_offset, y_offset)
 
-    else:
-        return jsonify({'error': 'Missing data (tag_name, latitude, longitude)'}), 400
+        # Update the tag's most recent location in the 'tags' table
+        c.execute("""
+            UPDATE tags
+            SET latitude = ?, longitude = ?
+            WHERE tag_id = ?
+        """, (tag_lat, tag_lon, tag_id))
+
+        # Insert the new location into the tag_locations table to maintain the history
+        c.execute("""INSERT INTO tag_locations (tag_id, latitude, longitude, mode, timestamp) 
+                     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""", 
+                  (tag_id, tag_lat, tag_lon, "UWB"))
+
+        # Commit the transaction
+        con.commit()
+        con.close()
+
+        return jsonify({'message': 'Tag location successfully added and updated'}), 201
+
+    except Exception as e:
+        return jsonify({'error': f'Error occurred while adding tag location: {str(e)}'}), 500
+
 
 
 # EDIT TAG PAGE
@@ -442,6 +460,85 @@ def add_tag_location():
 
     except Exception as e:
         return jsonify({'error': f'Error occurred while adding tag location: {str(e)}'}), 500
+    
+
+# Acquire a Tag's most recent location
+@app.route('/get_tag_location', methods=['GET'])
+def get_tag_location():
+    # Get user_id from session
+    user_id = session.get('user_id')
+
+    if user_id is None:
+        return jsonify({'error': 'User not logged in'}), 401  # Unauthorized if no user is logged in
+
+    try:
+        # Connect to Database
+        con = sqlite3.connect('users.db')
+        c = con.cursor()
+
+        # Fetch the most recent location for each tag of the user
+        c.execute("""
+            SELECT t.tag_id, t.tag_name, tl.latitude, tl.longitude, tl.timestamp 
+            FROM tags t
+            JOIN tag_locations tl ON t.tag_id = tl.tag_id
+            WHERE t.user_id = ?
+            AND tl.timestamp = (SELECT MAX(timestamp) FROM tag_locations WHERE tag_id = tl.tag_id)
+            """, (user_id,))
+
+        # Fetch all the results
+        recent_locations = c.fetchall()
+        con.close()
+
+        # If no tag locations are found, return an empty list or an appropriate message
+        if not recent_locations:
+            return jsonify({'message': 'No tag locations found for the user'}), 404
+
+        # Prepare the response
+        result = []
+        for loc in recent_locations:
+            result.append({
+                'tag_id': loc[0],
+                'tag_name': loc[1],
+                'latitude': loc[2],
+                'longitude': loc[3],
+                'timestamp': loc[4]
+            })
+
+        # Return the most recent locations
+        return jsonify({'recent_tag_locations': result}), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Error occurred while fetching recent tag locations: {str(e)}'}), 500
+    
+
+    
+
+# Request 24-hour history of a tag
+@app.route('/get_tag_location_history', methods=['GET'])
+def get_tag_location_history():
+    # Get user_id from session (assuming user is logged in)
+    user_id = session.get('user_id')
+
+    if user_id is None:
+        return jsonify({'error': 'User not logged in'}), 401  # Unauthorized if no user is logged in
+
+    # Get tag_id from incoming JSON request
+    data = request.get_json()
+    tag_id = data.get('tag_id')
+
+    if not tag_id:
+        return jsonify({'error': 'Missing tag_id'}), 400  # Bad request if no tag_id is provided
+
+    try:
+        # Connect to Database
+        con = sqlite3.connect('users.db')
+        c = con.cursor()
+
+        # Have to figure out how to acquire this data 
+
+    except Exception as e:
+        return jsonify({'error': f'Error occurred while fetching tag location history: {str(e)}'}), 500
+
 
 
 
