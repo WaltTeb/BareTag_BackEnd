@@ -500,56 +500,6 @@ def convert_to_gps(anchor_lat, anchor_lon, x_offset, y_offset):
 
     return new_lat, new_lon
 
-# ADD TAG LOCATION ROUTE
-@app.route('/add_tag_location', methods=['POST'])
-def add_tag_location():
-    # Get user_id from session
-    user_id = session.get('user_id')
-
-    if user_id is None:
-        return jsonify({'error': 'User not logged in'}), 401
-
-    # Get data from the request
-    data = request.get_json()
-    tag_id = data.get('tag_id')
-    anchor_id = data.get('anchor_id')
-    x_offset = data.get('x_offset')  # Relative position in meters on the X-axis
-    y_offset = data.get('y_offset')  # Relative position in meters on the Y-axis
-
-    if not tag_id or not anchor_id or x_offset is None or y_offset is None:
-        return jsonify({'error': 'Missing required data (tag_id, anchor_id, x_offset, y_offset)'}), 400
-
-    try:
-        # Connect to the database
-        con = sqlite3.connect('users.db')
-        c = con.cursor()
-
-        # Fetch the anchor's GPS coordinates
-        c.execute("SELECT latitude, longitude FROM anchors WHERE id=?", (anchor_id,))
-        anchor = c.fetchone()
-
-        if not anchor:
-            return jsonify({'error': 'Anchor not found'}), 404
-
-        anchor_lat = anchor[0]
-        anchor_lon = anchor[1]
-
-        # Calculate the tag's GPS coordinates based on the anchor's position
-        tag_lat, tag_lon = convert_to_gps(anchor_lat, anchor_lon, x_offset, y_offset)
-
-        # Insert the calculated location into the tag_locations table
-        c.execute("""INSERT INTO tag_locations (tag_id, latitude, longitude, mode, timestamp) 
-                     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""", 
-                  (tag_id, tag_lat, tag_lon, "UWB"))
-        con.commit()
-        con.close()
-
-        return jsonify({'message': 'Tag location successfully added'}), 201
-
-    except Exception as e:
-        return jsonify({'error': f'Error occurred while adding tag location: {str(e)}'}), 500
-    
-
 # Acquire a Tag's most recent location
 @app.route('/get_tag_location', methods=['GET'])
 def get_tag_location():
