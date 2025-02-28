@@ -225,7 +225,7 @@ def get_anchors():
         cur = con.cursor()
 
         # ✅ Fetch only the anchors belonging to the logged-in user
-        cur.execute("SELECT id, anchor_name, latitude, longitude FROM anchors WHERE user_id=?", (user_id,))
+        cur.execute("SELECT anchor_id, anchor_name, latitude, longitude FROM anchors WHERE user_id=?", (user_id,))
         anchors = cur.fetchall()
         con.close()
 
