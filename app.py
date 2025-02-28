@@ -11,13 +11,23 @@ import math
 app = Flask(__name__)
 app.secret_key = "__privatekey__"
 
-@app.before_request
-def check_session():
-    print(f"urrent Session User ID: {session.get('user_id')}")
 
 @app.route('/') # home page
 def Home():
     return render_template('home.html')
+
+
+
+@app.route('/session_check', methods=['GET'])
+def session_check():
+    user_id = session.get('user_id')
+    user_name = session.get('user_name')
+
+    if user_id:
+        return jsonify({"message": "User session active", "user_id": user_id, "user_name": user_name}), 200
+    else:
+        return jsonify({"error": "No active session"}), 401
+
 
 # LOGIN PAGE
 @app.route('/login', methods=['POST','GET'])
