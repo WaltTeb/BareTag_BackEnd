@@ -6,6 +6,8 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import math
+from flask_session import Session  # ✅ Import Flask-Session
+
 
 
 app = Flask(__name__)
@@ -16,6 +18,11 @@ app.secret_key = "__privatekey__"
 def Home():
     return render_template('home.html')
 
+
+# ✅ Configure Flask to use server-side sessions
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "filesystem"  # Use "filesystem" instead of default cookies
+Session(app)  # ✅ Initialize the session
 
 
 @app.route('/session_check', methods=['GET'])
@@ -29,27 +36,27 @@ def session_check():
         return jsonify({"error": "No active session"}), 401
 
 
-# LOGIN PAGE
-@app.route('/login', methods=['POST','GET'])
+# LOGIN
+@app.route('/login', methods=['POST'])
 def login():
-    if request.method == 'POST':
-        userName = request.get_json()['username']
-        passWord = request.get_json()['password']
-        con = sqlite3.connect('users.db')
-        c = con.cursor()
-        c.execute("SELECT * FROM profiles WHERE name=?", (userName,))  # Updated to match profiles table column
-        user = c.fetchone()
-        con.close()
-        
-        if user is None or not check_password_hash(user[2], passWord):  # not a valid user
-            return jsonify({'error': 'Invalid credentials'}), 401
+    data = request.get_json()
+    username = data.get("username")
+    password = data.get("password")
 
+    con = sqlite3.connect('users.db')
+    cur = con.cursor()
+    cur.execute("SELECT * FROM profiles WHERE name=?", (username,))
+    user = cur.fetchone()
+    con.close()
 
-        else:  # valid user bring them to their dashboard
+    if user is None or not check_password_hash(user[2], password):  
+        return jsonify({'error': 'Invalid credentials'}), 401
 
-            session['user_id'] = user[0]  # store user id in session
-            session['user_name'] = userName  # store user name in session
-            return jsonify({'message': 'Login successful', 'user_id': user[0], 'user_name': userName}), 200
+    session['user_id'] = user[0]  # ✅ Store user_id in session
+    session['user_name'] = username  # ✅ Store username in session
+
+    print(f"🟢 Session Data: {session}")  # ✅ Debug: Print session contents
+    return jsonify({'message': 'Login successful', 'user_id': user[0], 'user_name': username}), 200
 
 
 # REGISTRATION PAGE
