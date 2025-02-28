@@ -250,13 +250,15 @@ def delete_anchor():
         anchor_id = data.get('anchor_id')
         user_id = session.get('user_id')  # Ensure user is logged in
 
+        print(f"🟢 Incoming delete request - Anchor ID: {anchor_id}, User ID: {user_id}")  # ✅ Debugging
+
         if not user_id:
             return jsonify({'error': 'User not logged in'}), 401
 
         con = sqlite3.connect('users.db')
         cur = con.cursor()
 
-        # ✅ Make sure the anchor belongs to the logged-in user before deleting
+        # ✅ Check if the anchor exists for this user
         cur.execute("SELECT * FROM anchors WHERE id=? AND user_id=?", (anchor_id, user_id))
         anchor = cur.fetchone()
 
@@ -268,7 +270,9 @@ def delete_anchor():
         else:
             return jsonify({'error': 'Anchor not found or unauthorized'}), 404
     except Exception as e:
+        print(f"❌ Error deleting anchor: {str(e)}")  # ✅ Print the error in Flask logs
         return jsonify({'error': f'Error deleting anchor: {str(e)}'}), 500
+
 
 
 
