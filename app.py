@@ -11,6 +11,10 @@ import math
 app = Flask(__name__)
 app.secret_key = "__privatekey__"
 
+@app.before_request
+def check_session():
+    print(f"urrent Session User ID: {session.get('user_id')}")
+
 @app.route('/') # home page
 def Home():
     return render_template('home.html')
