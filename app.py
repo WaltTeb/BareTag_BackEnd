@@ -69,6 +69,15 @@ def logout():
     return jsonify({"message": "Logout successful"}), 200
 
 
+
+# # LOGOUT PAGE
+# @app.route('/logout')
+# def logout():
+#     # Clear the session data
+#     session.clear()
+#     return redirect(url_for('login'))
+
+
 # REGISTRATION PAGE
 @app.route('/registration', methods=['POST'])
 def registration():
@@ -509,12 +518,7 @@ def add_tag_location():
 
 
 
-# LOGOUT PAGE
-@app.route('/logout')
-def logout():
-    # Clear the session data
-    session.clear()
-    return redirect(url_for('login'))
+
 
 
 if __name__ == "__main__":
