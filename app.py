@@ -158,6 +158,41 @@ def edit_anchor():
     else:
         return jsonify({'error': 'Missing data for anchor update'}), 400
 
+
+# ADD ANCHOR ROUTE
+@app.route('/get_anchors', methods=['GET'])
+def get_anchors():
+    try:
+        # Connect to SQLite database
+        con = sqlite3.connect('users.db')
+        cur = con.cursor()
+
+        # Fetch all anchors from the database
+        cur.execute("SELECT id, user_id, anchor_name, latitude, longitude, created_at FROM anchors")
+        anchors = cur.fetchall()
+        con.close()
+
+        # Convert data to JSON format
+        anchor_list = [
+            {
+                "id": row[0],
+                "user_id": row[1],
+                "name": row[2],
+                "latitude": row[3],
+                "longitude": row[4],
+                "created_at": row[5]
+            }
+            for row in anchors
+        ]
+
+        # Return the anchor data as JSON
+        return jsonify({"anchors": anchor_list, "message": "Anchors fetched successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Error retrieving anchors: {str(e)}"}), 500
+    
+
+
 # DELETE ANCHOR ROUTE
 @app.route('/delete_anchor', methods=['POST'])
 def delete_anchor():
