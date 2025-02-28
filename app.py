@@ -18,13 +18,15 @@ app.secret_key = "__privatekey__"
 def Home():
     return render_template('home.html')
 
+# ————————————————————————————————————————————————- SESSION ————————————————————————————————————————————————
 
-# ✅ Configure Flask to use server-side sessions
+# Configure Flask to use server-side sessions
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"  # Use "filesystem" instead of default cookies
 Session(app)  # ✅ Initialize the session
 
 
+# CHECK USER SESSION
 @app.route('/session_check', methods=['GET'])
 def session_check():
     user_id = session.get('user_id')
@@ -34,7 +36,9 @@ def session_check():
         return jsonify({"message": "User session active", "user_id": user_id, "user_name": user_name}), 200
     else:
         return jsonify({"error": "No active session"}), 401
+    
 
+# ——————————————————————————————————————————————— LOGIN & REGISTRATION ———————————————————————————————————————————————
 
 # LOGIN
 @app.route('/login', methods=['POST'])
@@ -57,6 +61,12 @@ def login():
 
     print(f"🟢 Session Data: {session}")  # ✅ Debug: Print session contents
     return jsonify({'message': 'Login successful', 'user_id': user[0], 'user_name': username}), 200
+
+# LOGOUT
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.clear()  # ✅ This removes all session data
+    return jsonify({"message": "Logout successful"}), 200
 
 
 # REGISTRATION PAGE
@@ -99,6 +109,7 @@ def registration():
         # Catch any unexpected errors and return a response
         return jsonify({'error': f'An error occurred: {str(e)}'}), 500
 
+# —————————————————————————————————————————————————————— ANCHORS ——————————————————————————————————————————————————————
 
 # ADD ANCHOR ROUTE
 @app.route('/add_anchor', methods=['POST'])
@@ -208,8 +219,6 @@ def get_anchors():
 
     except Exception as e:
         return jsonify({"error": f"Error retrieving anchors: {str(e)}"}), 500
-    
-
 
 # DELETE ANCHOR ROUTE
 @app.route('/delete_anchor', methods=['POST'])
@@ -259,6 +268,8 @@ def delete_anchor():
     else:
         return jsonify({'error': 'Missing anchor_id'}), 400  # Bad request if no anchor_id is provided
 
+
+# —————————————————————————————————————————————————————— TAGS ——————————————————————————————————————————————————————
 
 
 # NEED KEN TO SEND TAG INFO WITH TAG NAME, LATITUDE, and LONGITUDE
