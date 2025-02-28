@@ -161,6 +161,7 @@ def add_anchor_to_dashboard():
         # If any of the required fields are missing, return a bad request error
         return jsonify({'error': 'Missing data (anchor_id, anchor_name, latitude, or longitude)'}), 400
 
+
 # EDIT ANCHOR PAGE
 @app.route('/edit_anchor', methods=['POST'])
 def edit_anchor():
@@ -203,6 +204,7 @@ def edit_anchor():
     else:
         return jsonify({'error': 'Missing data for anchor update'}), 400
 
+
 # GET ANCHORS ROUTE
 @app.route('/get_anchors', methods=['GET'])
 def get_anchors():
@@ -239,53 +241,35 @@ def get_anchors():
         return jsonify({"error": f"Error retrieving anchors: {str(e)}"}), 500
 
 
+
 # DELETE ANCHOR ROUTE
 @app.route('/delete_anchor', methods=['POST'])
 def delete_anchor():
-    # Get user_id from session (assuming the user is logged in)
-    user_id = session.get('user_id')
+    try:
+        data = request.get_json()
+        anchor_id = data.get('anchor_id')
+        user_id = session.get('user_id')  # Ensure user is logged in
 
-    if user_id is None:
-        return jsonify({'error': 'User not logged in'}), 401  # Unauthorized if no user is logged in
+        if not user_id:
+            return jsonify({'error': 'User not logged in'}), 401
 
-    # Extract data from incoming JSON request
-    data = request.get_json()
+        con = sqlite3.connect('users.db')
+        cur = con.cursor()
 
-    # Extract the anchor_id from the request
-    anchor_id = data.get('anchor_id')
+        # ✅ Make sure the anchor belongs to the logged-in user before deleting
+        cur.execute("SELECT * FROM anchors WHERE id=? AND user_id=?", (anchor_id, user_id))
+        anchor = cur.fetchone()
 
-    # Ensure that the anchor_id is provided
-    if anchor_id:
-        try:
-            # Connect to the database
-            con = sqlite3.connect('users.db')
-            c = con.cursor()
-
-            # Fetch the anchor's current details from the 'anchors' table
-            c.execute("SELECT * FROM anchors WHERE anchor_id=?", (anchor_id,))
-            anchor = c.fetchone()
-
-            if not anchor:
-                return jsonify({'error': 'Anchor not found'}), 404  # If anchor does not exist, return an error
-
-            # Check if the user owns the anchor (based on user_id)
-            if anchor[1] != user_id:  # Assuming 'user_id' is at index 1 in the fetched anchor tuple
-                return jsonify({'error': 'You do not have permission to delete this anchor'}), 403  # Forbidden
-
-            # Delete the anchor from the database
-            c.execute("DELETE FROM anchors WHERE anchor_id=?", (anchor_id,))
+        if anchor:
+            cur.execute("DELETE FROM anchors WHERE id=? AND user_id=?", (anchor_id, user_id))
             con.commit()
             con.close()
+            return jsonify({'message': 'Anchor deleted successfully'}), 200
+        else:
+            return jsonify({'error': 'Anchor not found or unauthorized'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Error deleting anchor: {str(e)}'}), 500
 
-            # Return success response
-            return jsonify({'message': 'Anchor successfully deleted'}), 200
-
-        except Exception as e:
-            # Handle any errors
-            return jsonify({'error': f'Error occurred while deleting anchor: {str(e)}'}), 500
-
-    else:
-        return jsonify({'error': 'Missing anchor_id'}), 400  # Bad request if no anchor_id is provided
 
 
 # —————————————————————————————————————————————————————— TAGS ——————————————————————————————————————————————————————
