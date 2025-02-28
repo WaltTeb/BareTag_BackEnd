@@ -248,9 +248,9 @@ def delete_anchor():
     try:
         data = request.get_json()
         anchor_id = data.get('anchor_id')
-        user_id = session.get('user_id')  # Get logged-in user
+        user_id = session.get('user_id')  
 
-        print(f"🟢 Deleting Anchor ID: {anchor_id} for User ID: {user_id}")  # ✅ Debugging
+        print(f"🟢 Incoming Delete Request - Anchor ID: {anchor_id}, User ID: {user_id}")  # ✅ Debugging
 
         if not user_id:
             return jsonify({'error': 'User not logged in'}), 401
@@ -261,14 +261,15 @@ def delete_anchor():
         con = sqlite3.connect('users.db')
         cur = con.cursor()
 
-        # Ensure anchor exists & belongs to the user
+        # ✅ Check if anchor exists before deleting
         cur.execute("SELECT * FROM anchors WHERE id=? AND user_id=?", (anchor_id, user_id))
         anchor = cur.fetchone()
 
         if not anchor:
+            print(f"❌ Anchor ID {anchor_id} not found for User ID {user_id}")
             return jsonify({'error': 'Anchor not found or unauthorized'}), 404
 
-        # Delete the anchor
+        # ✅ Delete anchor
         cur.execute("DELETE FROM anchors WHERE id=? AND user_id=?", (anchor_id, user_id))
         con.commit()
         con.close()
@@ -279,6 +280,7 @@ def delete_anchor():
     except Exception as e:
         print(f"❌ Error deleting anchor: {str(e)}")
         return jsonify({'error': f'Error deleting anchor: {str(e)}'}), 500
+
 
 
 
