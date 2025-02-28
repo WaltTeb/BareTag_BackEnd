@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import math
 from flask_session import Session  # ✅ Import Flask-Session
+from flask_cors import CORS
 
 
 
@@ -14,11 +15,14 @@ app = Flask(__name__)
 app.secret_key = "__privatekey__"
 
 
+
 @app.route('/') # home page
 def Home():
     return render_template('home.html')
 
 # ————————————————————————————————————————————————- SESSION ————————————————————————————————————————————————
+
+CORS(app, supports_credentials=True)  # ✅ Allow iOS to send session cookies
 
 # Configure Flask to use server-side sessions
 app.config["SESSION_PERMANENT"] = False
