@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Activate virtual environment for using flask
-source ~/venv/bin/activate
+source ~/Documents/BareTag_BackEnd/venv/bin/activate
 
 sleep 1
 
