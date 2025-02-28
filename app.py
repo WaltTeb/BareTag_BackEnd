@@ -348,10 +348,10 @@ def add_tag_location():
         #           (tag_id, tag_lat, tag_lon, "UWB"))
 
         # # Commit the transaction
-        # con.commit()
-        # con.close()
+        con.commit()
+        con.close()
 
-        # return jsonify({'message': 'Tag location successfully added and updated'}), 201
+        return jsonify({'message': 'Tag location successfully added and updated'}), 201
 
     except Exception as e:
         return jsonify({'error': f'Error occurred while adding tag location: {str(e)}'}), 500
