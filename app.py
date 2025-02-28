@@ -299,7 +299,7 @@ def delete_anchor():
 # NEED KEN TO SEND TAG INFO WITH TAG NAME, LATITUDE, and LONGITUDE
 # Very SIMILAR TO ADDING AN ANCHOR
 
-@app.route('/add_tag_location', methods=['POST'])
+@app.route('/add_tag', methods=['POST'])
 def add_tag_location():
     # Get user_id from session
     user_id = session.get('user_id')
