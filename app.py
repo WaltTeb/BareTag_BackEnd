@@ -336,34 +336,24 @@ def add_tag_location():
 
         # Fetch the anchor's GPS coordinates
         c.execute("SELECT latitude, longitude FROM anchors WHERE id=?", (anchor_id,))
-        anchor = c.fetchone()
-
-        if not anchor:
-            return jsonify({'error': 'Anchor not found'}), 404
-
-        anchor_lat = anchor[3]  # Longitude of the anchor
-        anchor_lon = anchor[4]  # Latitude of the anchor
-
-        # Calculate the tag's GPS coordinates based on the anchor's position
-        tag_lat, tag_lon = convert_to_gps(anchor_lat, anchor_lon, x_offset, y_offset)
 
         # Update the tag's most recent location in the 'tags' table
-        c.execute("""
-            UPDATE tags
-            SET latitude = ?, longitude = ?
-            WHERE tag_id = ?
-        """, (tag_lat, tag_lon, tag_id))
+       # c.execute("""
+        #     UPDATE tags
+        #     SET latitude = ?, longitude = ?
+        #     WHERE tag_id = ?
+        # """, (tag_lat, tag_lon, tag_id))
 
-        # Insert the new location into the tag_locations table to maintain the history
-        c.execute("""INSERT INTO tag_locations (tag_id, latitude, longitude, mode, timestamp) 
-                     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""", 
-                  (tag_id, tag_lat, tag_lon, "UWB"))
+        # # Insert the new location into the tag_locations table to maintain the history
+        # c.execute("""INSERT INTO tag_locations (tag_id, latitude, longitude, mode, timestamp) 
+        #              VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""", 
+        #           (tag_id, tag_lat, tag_lon, "UWB"))
 
-        # Commit the transaction
-        con.commit()
-        con.close()
+        # # Commit the transaction
+        # con.commit()
+        # con.close()
 
-        return jsonify({'message': 'Tag location successfully added and updated'}), 201
+        # return jsonify({'message': 'Tag location successfully added and updated'}), 201
 
     except Exception as e:
         return jsonify({'error': f'Error occurred while adding tag location: {str(e)}'}), 500
@@ -549,8 +539,6 @@ def get_tag_location():
         return jsonify({'error': f'Error occurred while fetching recent tag locations: {str(e)}'}), 500
     
 
-    
-
 # Request 24-hour history of a tag
 @app.route('/get_tag_location_history', methods=['GET'])
 def get_tag_location_history():
@@ -576,10 +564,6 @@ def get_tag_location_history():
 
     except Exception as e:
         return jsonify({'error': f'Error occurred while fetching tag location history: {str(e)}'}), 500
-
-
-
-
 
 
 
