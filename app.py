@@ -250,7 +250,7 @@ def delete_anchor():
         anchor_id = data.get('anchor_id')
         user_id = session.get('user_id')  
 
-        print(f"🟢 Incoming Delete Request - Anchor ID: {anchor_id}, User ID: {user_id}")  # ✅ Debugging
+        print(f"🟢 Incoming Delete Request - Anchor ID: {anchor_id}, User ID: {user_id}")
 
         if not user_id:
             return jsonify({'error': 'User not logged in'}), 401
@@ -258,10 +258,14 @@ def delete_anchor():
         if not anchor_id:
             return jsonify({'error': 'Missing anchor ID'}), 400
 
+        # ✅ Convert `anchor_id` to INT if stored as INTEGER
+        if isinstance(anchor_id, str) and anchor_id.isdigit():
+            anchor_id = int(anchor_id)
+
         con = sqlite3.connect('users.db')
         cur = con.cursor()
 
-        # ✅ Check if anchor exists before deleting
+        # ✅ Debug: Check if anchor exists in the database
         cur.execute("SELECT * FROM anchors WHERE id=? AND user_id=?", (anchor_id, user_id))
         anchor = cur.fetchone()
 
