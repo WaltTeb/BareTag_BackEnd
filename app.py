@@ -309,9 +309,7 @@ def add_tag_location():
 
     # Get data from the request
     data = request.get_json()
-    tag_id = data.get('tag_id')
     tag_name = data.get('tag_name') 
-    anchor_id = data.get('anchor_id')  # Anchor that is acting as the (0, 0)
     x_offset = data.get('x_offset')  # Relative position in meters on the X-axis
     y_offset = data.get('y_offset')  # Relative position in meters on the Y-axis
 
@@ -335,7 +333,7 @@ def add_tag_location():
             """, (tag_id, tag_name, user_id, 0.0, 0.0))  # Default location set to 0.0, 0.0
 
         # Fetch the anchor's GPS coordinates
-        c.execute("SELECT latitude, longitude FROM anchors WHERE id=?", (anchor_id,))
+        #c.execute("SELECT latitude, longitude FROM anchors WHERE id=?", (anchor_id,))
 
         # Update the tag's most recent location in the 'tags' table
        # c.execute("""
