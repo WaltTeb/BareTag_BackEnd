@@ -248,30 +248,38 @@ def delete_anchor():
     try:
         data = request.get_json()
         anchor_id = data.get('anchor_id')
-        user_id = session.get('user_id')  # Ensure user is logged in
+        user_id = session.get('user_id')  # Get logged-in user
 
-        print(f"🟢 Incoming delete request - Anchor ID: {anchor_id}, User ID: {user_id}")  # ✅ Debugging
+        print(f"🟢 Deleting Anchor ID: {anchor_id} for User ID: {user_id}")  # ✅ Debugging
 
         if not user_id:
             return jsonify({'error': 'User not logged in'}), 401
 
+        if not anchor_id:
+            return jsonify({'error': 'Missing anchor ID'}), 400
+
         con = sqlite3.connect('users.db')
         cur = con.cursor()
 
-        # ✅ Check if the anchor exists for this user
+        # Ensure anchor exists & belongs to the user
         cur.execute("SELECT * FROM anchors WHERE id=? AND user_id=?", (anchor_id, user_id))
         anchor = cur.fetchone()
 
-        if anchor:
-            cur.execute("DELETE FROM anchors WHERE id=? AND user_id=?", (anchor_id, user_id))
-            con.commit()
-            con.close()
-            return jsonify({'message': 'Anchor deleted successfully'}), 200
-        else:
+        if not anchor:
             return jsonify({'error': 'Anchor not found or unauthorized'}), 404
+
+        # Delete the anchor
+        cur.execute("DELETE FROM anchors WHERE id=? AND user_id=?", (anchor_id, user_id))
+        con.commit()
+        con.close()
+
+        print(f"✅ Successfully deleted Anchor ID: {anchor_id} for User ID: {user_id}")
+        return jsonify({'message': 'Anchor deleted successfully'}), 200
+
     except Exception as e:
-        print(f"❌ Error deleting anchor: {str(e)}")  # ✅ Print the error in Flask logs
+        print(f"❌ Error deleting anchor: {str(e)}")
         return jsonify({'error': f'Error deleting anchor: {str(e)}'}), 500
+
 
 
 
