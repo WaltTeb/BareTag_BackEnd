@@ -206,22 +206,34 @@ def edit_anchor():
 # GET ANCHORS ROUTE
 @app.route('/get_anchors', methods=['GET'])
 def get_anchors():
-    # ✅ Get user_id from session
-    user_id = session.get('user_id')
-
-    if not user_id:
-        return jsonify({'error': 'User not logged in'}), 401
-
     try:
+        # ✅ Get user_id from session
+        user_id = session.get('user_id')
+
+        if not user_id:
+            return jsonify({'error': 'User not logged in'}), 401  # Unauthorized
+
+        # ✅ Connect to SQLite database
         con = sqlite3.connect('users.db')
         cur = con.cursor()
 
-        # ✅ Fetch anchors only for the logged-in user
+        # ✅ Fetch only the anchors belonging to the logged-in user
         cur.execute("SELECT id, anchor_name, latitude, longitude FROM anchors WHERE user_id=?", (user_id,))
-        anchors = [{"id": row[0], "name": row[1], "latitude": row[2], "longitude": row[3]} for row in cur.fetchall()]
-
+        anchors = cur.fetchall()
         con.close()
-        return jsonify({"anchors": anchors, "message": "Anchors fetched successfully"})
+
+        # ✅ Convert data to JSON format
+        anchor_list = [
+            {
+                "id": str(row[0]),  # Convert ID to string
+                "name": row[1],     # Anchor name
+                "latitude": row[2], # Latitude
+                "longitude": row[3] # Longitude
+            }
+            for row in anchors
+        ]
+
+        return jsonify({"anchors": anchor_list, "message": "Anchors fetched successfully"}), 200
 
     except Exception as e:
         return jsonify({"error": f"Error retrieving anchors: {str(e)}"}), 500
