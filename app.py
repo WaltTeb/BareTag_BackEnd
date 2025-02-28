@@ -329,7 +329,7 @@ def add_tag_location():
             # If the tag doesn't exist, insert it into the tags table
             c.execute("""
                 INSERT INTO tags (tag_name, user_id, latitude, longitude)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?)
             """, (tag_name, user_id, 0.0, 0.0))  # Default location set to 0.0, 0.0
 
         # Fetch the anchor's GPS coordinates
