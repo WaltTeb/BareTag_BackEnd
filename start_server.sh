@@ -11,4 +11,5 @@ nohup python app.py > flask.log 2>&1 &
 sleep 1
 
 # Turn on the ngrok server
-ngrok http --domain=vital-dear-rattler.ngrok-free.app 5000 > ngrok.log 2>&1 &
+# ngrok http --domain=vital-dear-rattler.ngrok-free.app 5000 > ngrok.log 2>&1 &
+ngrok http --domain=5658-128-119-77-226.ngrok-free.app 5000 > ngrok.log 2>&1 &
