@@ -322,7 +322,7 @@ def add_tag_location():
         c = con.cursor()
 
         # Check if the tag exists in the tags table
-        c.execute("SELECT tag_id FROM tags WHERE tag_name = ?", (tag_name,))
+        c.execute("SELECT tag_name FROM tags WHERE tag_name = ?", (tag_name,))
         existing_tag = c.fetchone()
 
         if not existing_tag:
