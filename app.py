@@ -175,12 +175,10 @@ def get_anchors():
         # Convert data to JSON format
         anchor_list = [
             {
-                "id": str(row[0]),  # Convert ID to string to match API format
-                "name": row[1],
-                "latitude": row[2],
-                "longitude": row[3],
-                "positionX": row[4],
-                "positionY": row[5]
+                "id": str(row[0]),  # Convert ID to string
+                "name": row[1],     # Anchor name
+                "latitude": row[2], # Latitude
+                "longitude": row[3] # Longitude
             }
             for row in anchors
         ]
