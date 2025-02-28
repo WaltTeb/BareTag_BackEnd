@@ -14,8 +14,8 @@ sleep 1
 pkill -f ngrok  
 
 # Turn on the ngrok server
-# ngrok http --domain=vital-dear-rattler.ngrok-free.app 5000 > ngrok.log 2>&1 &
-ngrok http 5000 > ngrok.log 2>&1 &
+ngrok http --domain=vital-dear-rattler.ngrok-free.app 5000 > ngrok.log 2>&1 &
+# ngrok http 5000 > ngrok.log 2>&1 &
 
 # Wait for ngrok to initialize
 sleep 2
