@@ -125,7 +125,6 @@ def registration():
 # —————————————————————————————————————————————————————— ANCHORS ——————————————————————————————————————————————————————
 
 # ADD ANCHOR ROUTE
-# ADD ANCHOR ROUTE
 @app.route('/add_anchor', methods=['POST'])
 def add_anchor_to_dashboard():
     # Extract data from the incoming JSON payload
@@ -290,12 +289,6 @@ def delete_anchor():
     except Exception as e:
         print(f"❌ Error deleting anchor: {str(e)}")
         return jsonify({'error': f'Error deleting anchor: {str(e)}'}), 500
-
-
-
-
-
-
 
 
 
