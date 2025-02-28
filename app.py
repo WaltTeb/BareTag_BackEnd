@@ -125,6 +125,7 @@ def registration():
 # —————————————————————————————————————————————————————— ANCHORS ——————————————————————————————————————————————————————
 
 # ADD ANCHOR ROUTE
+# ADD ANCHOR ROUTE
 @app.route('/add_anchor', methods=['POST'])
 def add_anchor_to_dashboard():
     # Extract data from the incoming JSON payload
@@ -150,16 +151,21 @@ def add_anchor_to_dashboard():
                          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""",
                       (user_id, anchor_name, latitude, longitude))
             con.commit()
+
+            # Get the ID of the newly inserted anchor
+            anchor_id = c.lastrowid  # This is the server-generated ID (integer)
+
             con.close()
 
-            # Return a success response to the frontend
-            return jsonify({'message': 'Anchor successfully added to dashboard!'}), 201
+            # Return a success response to the frontend with the server-generated ID
+            return jsonify({'message': 'Anchor successfully added to dashboard!', 'anchor_id': anchor_id}), 201
         except Exception as e:
             # In case of an error, return an error response
             return jsonify({'error': f'Error occurred while adding anchor: {str(e)}'}), 500
     else:
         # If any of the required fields are missing, return a bad request error
-        return jsonify({'error': 'Missing data (anchor_id, anchor_name, latitude, or longitude)'}), 400
+        return jsonify({'error': 'Missing data (anchor_name, latitude, or longitude)'}), 400
+
 
 
 # EDIT ANCHOR PAGE
