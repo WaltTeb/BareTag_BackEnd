@@ -313,7 +313,7 @@ def add_tag_location():
     x_offset = data.get('x_offset')  # Relative position in meters on the X-axis
     y_offset = data.get('y_offset')  # Relative position in meters on the Y-axis
 
-    if not tag_id or not anchor_id or x_offset is None or y_offset is None:
+    if not tag_name or x_offset is None or y_offset is None:
         return jsonify({'error': 'Missing required data (tag_id, anchor_id, x_offset, y_offset)'}), 400
 
     try:
