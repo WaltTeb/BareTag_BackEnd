@@ -79,7 +79,7 @@ def registration():
         return jsonify({'error': f'An error occurred: {str(e)}'}), 500
 
 
-
+# ADD ANCHOR ROUTE
 @app.route('/add_anchor', methods=['POST'])
 def add_anchor_to_dashboard():
     # Extract data from the incoming JSON payload
@@ -158,8 +158,7 @@ def edit_anchor():
     else:
         return jsonify({'error': 'Missing data for anchor update'}), 400
 
-
-# ADD ANCHOR ROUTE
+# GET ANCHORS ROUTE
 @app.route('/get_anchors', methods=['GET'])
 def get_anchors():
     try:
@@ -175,7 +174,7 @@ def get_anchors():
         # Convert data to JSON format
         anchor_list = [
             {
-                "id": str(row[0]),  # Convert ID to string
+                "id": row[0],       # Anchor ID
                 "name": row[1],     # Anchor name
                 "latitude": row[2], # Latitude
                 "longitude": row[3] # Longitude
