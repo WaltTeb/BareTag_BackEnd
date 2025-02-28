@@ -430,17 +430,17 @@ def delete_tag():
     data = request.get_json()
 
     # Extract the tag_id from the request
-    tag_id = data.get('tag_id')
+    tag_name = data.get('tag_name')
 
     # Ensure that the tag_id is provided
-    if tag_id:
+    if tag_name:
         try:
             # Connect to the database
             con = sqlite3.connect('users.db')
             c = con.cursor()
 
             # Fetch the tag's current details from the 'tags' table
-            c.execute("SELECT * FROM tags WHERE tag_id=?", (tag_id,))
+            c.execute("SELECT * FROM tags WHERE tag_name=?", (tag_name,))
             tag = c.fetchone()
 
             if not tag:
@@ -451,10 +451,10 @@ def delete_tag():
                 return jsonify({'error': 'You do not have permission to delete this tag'}), 403  # Forbidden
 
             # Delete related entries in 'tag_locations'
-            c.execute("DELETE FROM tag_locations WHERE tag_id=?", (tag_id,))
+            c.execute("DELETE FROM tag_locations WHERE tag_name=?", (tag_name,))
 
             # Delete the tag from the database
-            c.execute("DELETE FROM tags WHERE tag_id=?", (tag_id,))
+            c.execute("DELETE FROM tags WHERE tag_name=?", (tag_name,))
             con.commit()
             con.close()
 
