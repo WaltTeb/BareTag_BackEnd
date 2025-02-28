@@ -249,52 +249,48 @@ def get_anchors():
 
 
 # DELETE ANCHOR ROUTE
-from flask import jsonify, request, session
-import sqlite3
-
 @app.route('/delete_anchor', methods=['POST'])
 def delete_anchor():
     try:
+        # Extract data from the incoming JSON payload
         data = request.get_json()
-        anchor_id = data.get('anchor_id')
-        user_id = session.get('user_id')  # Ensure the user is logged in
+        anchor_name = data.get('anchor_name')  # Get anchor name from request
+        user_id = session.get('user_id')  # Get user_id from session
 
-        print(f"🟢 Incoming Delete Request - Anchor ID: {anchor_id}, User ID: {user_id}")
+        print(f"🟢 Incoming Delete Request - Anchor Name: {anchor_name}, User ID: {user_id}")
 
         # Validate user session
         if not user_id:
             return jsonify({'error': 'User not logged in'}), 401
 
-        # Validate anchor_id
-        if not anchor_id:
-            return jsonify({'error': 'Missing anchor ID'}), 400
+        # Validate anchor_name
+        if not anchor_name:
+            return jsonify({'error': 'Missing anchor name'}), 400
 
-        # Convert `anchor_id` to INT if it's a string representation of a number
-        if isinstance(anchor_id, str) and anchor_id.isdigit():
-            anchor_id = int(anchor_id)
+        # Database connection
+        con = sqlite3.connect('users.db')
+        cur = con.cursor()
 
-        # Use context manager to automatically close the connection
-        with sqlite3.connect('users.db') as con:
-            cur = con.cursor()
+        # ✅ Check if the anchor exists for the given user_id and anchor_name
+        cur.execute("SELECT * FROM anchors WHERE user_id = ? AND anchor_name = ?", (user_id, anchor_name))
+        anchor = cur.fetchone()
 
-            # Check if the anchor exists and is owned by the user
-            cur.execute("SELECT * FROM anchors WHERE id=? AND user_id=?", (anchor_id, user_id))
-            anchor = cur.fetchone()
+        if not anchor:
+            print(f"❌ No anchor found for User ID {user_id} and Anchor Name {anchor_name}")
+            return jsonify({'error': 'Anchor not found or unauthorized'}), 404
 
-            if not anchor:
-                print(f"❌ Anchor ID {anchor_id} not found for User ID {user_id}")
-                return jsonify({'error': 'Anchor not found or unauthorized'}), 404
+        # ✅ Delete the anchor
+        cur.execute("DELETE FROM anchors WHERE user_id = ? AND anchor_name = ?", (user_id, anchor_name))
+        con.commit()
+        con.close()
 
-            # Delete the anchor from the database
-            cur.execute("DELETE FROM anchors WHERE id=? AND user_id=?", (anchor_id, user_id))
-            con.commit()
-
-        print(f"✅ Successfully deleted Anchor ID: {anchor_id} for User ID: {user_id}")
+        print(f"✅ Successfully deleted Anchor for User ID: {user_id} and Anchor Name: {anchor_name}")
         return jsonify({'message': 'Anchor deleted successfully'}), 200
 
     except Exception as e:
         print(f"❌ Error deleting anchor: {str(e)}")
         return jsonify({'error': f'Error deleting anchor: {str(e)}'}), 500
+
 
 
 
