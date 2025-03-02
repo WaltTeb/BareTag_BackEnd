@@ -10,11 +10,8 @@ from flask_session import Session  # ✅ Import Flask-Session
 from flask_cors import CORS
 
 
-
 app = Flask(__name__)
 app.secret_key = "__privatekey__"
-
-
 
 @app.route('/') # home page
 def Home():
@@ -71,16 +68,6 @@ def login():
 def logout():
     session.clear()  # ✅ This removes all session data
     return jsonify({"message": "Logout successful"}), 200
-
-
-
-# # LOGOUT PAGE
-# @app.route('/logout')
-# def logout():
-#     # Clear the session data
-#     session.clear()
-#     return redirect(url_for('login'))
-
 
 # REGISTRATION PAGE
 @app.route('/registration', methods=['POST'])
@@ -438,7 +425,7 @@ def add_tag_from_tcp():
     con.close()
 
     # Send response
-    return jsonify({"message": message, "tag": tag_name, "latitude": latitude, "longitude": longitude})
+    return jsonify({"message": message, "tag": tag_name, "latitude": tag_latitude, "longitude": tag_longitude})
 
 
 
@@ -552,26 +539,6 @@ def delete_tag():
 
     else:
         return jsonify({'error': 'Missing tag_id'}), 400  # Bad request if no tag_id is provided
-
-# Function needed to find a tag's gps coordinates
-# Assumes the grid is in meters, and the location of the anchor is in lat, lon format
-# def convert_to_gps(anchor_lat, anchor_lon, x_offset, y_offset):
-#     # Earth radius in meters
-#     R = 6371000  
-
-#     # Convert latitude and longitude to radians
-#     lat_rad = math.radians(anchor_lat)
-#     lon_rad = math.radians(anchor_lon)
-
-#     # Calculate new latitude and longitude based on the offsets (in meters)
-#     new_lat = lat_rad + (y_offset / R)
-#     new_lon = lon_rad + (x_offset / (R * math.cos(math.pi * lat_rad / 180)))
-
-#     # Convert back to degrees
-#     new_lat = math.degrees(new_lat)
-#     new_lon = math.degrees(new_lon)
-
-#     return new_lat, new_lon
 
 # Acquire a Tag's most recent location
 @app.route('/get_tag_location', methods=['GET'])
