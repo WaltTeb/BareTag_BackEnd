@@ -584,6 +584,7 @@ def get_tag_location():
             })
 
         # Return the most recent locations
+        print(f"🔍 Query Result: {recent_locations}")  # Add this before returning JSON
         return jsonify({'recent_tag_locations': result}), 200
 
     except Exception as e:
