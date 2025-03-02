@@ -569,7 +569,8 @@ def get_tag_location():
 
         # If no tag locations are found, return an empty list or an appropriate message
         if not recent_locations:
-            return jsonify({'message': 'No tag locations found for the user'}), 404
+            return jsonify({'recent_tag_locations': [], 'message': 'No tag locations found for the user'}), 200
+
 
         # Prepare the response
         result = []
@@ -583,9 +584,7 @@ def get_tag_location():
             })
 
         # Return the most recent locations
-        if not recent_locations:
-            return jsonify({'recent_tag_locations': [], 'message': 'No tag locations found for the user'}), 200
-
+        return jsonify({'recent_tag_locations': result}), 200
 
     except Exception as e:
         return jsonify({'error': f'Error occurred while fetching recent tag locations: {str(e)}'}), 500
