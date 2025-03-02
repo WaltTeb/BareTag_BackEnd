@@ -356,6 +356,41 @@ def add_tag_location():
     except Exception as e:
         return jsonify({'error': f'Error occurred while adding tag location: {str(e)}'}), 500
 
+@app.route('/add_tag_from_tcp', methods=['POST'])
+def add_tag_from_tcp():
+    try:
+        # Extract data from the incoming JSON request
+        data = request.get_json()
+
+        # Get user_id from session (user is logged in)
+        user_id = session.get('user_id')
+        if user_id is None:
+            return jsonify({'error': 'User not logged in'}), 401  # Unauthorized if no user is logged in
+
+        tag_name = data.get('tag_name')
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+        tag_id = data.get('tag_id')
+
+        # Check if the data is valid
+        if not tag_name or latitude is None or longitude is None or tag_id is None:
+            return jsonify({'error': 'Missing required data (tag_id, tag_name, latitude, longitude)'}), 400
+
+        # Update the tag data in the 'tags' table (assuming you have a 'tags' table and 'tag_id' column)
+        con = sqlite3.connect('users.db')
+        c = con.cursor()
+        c.execute("""UPDATE tags SET tag_name = ?, latitude = ?, longitude = ? WHERE tag_id = ?""", 
+                  (tag_name, latitude, longitude, tag_id))
+        con.commit()
+        con.close()
+
+        return jsonify({'message': 'Tag updated successfully'}), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Error occurred while updating tag: {str(e)}'}), 500
+
+
+
 
 
 # EDIT TAG PAGE
