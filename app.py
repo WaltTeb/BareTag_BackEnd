@@ -136,23 +136,24 @@ def add_anchor_to_dashboard():
         return jsonify({'error': 'User not logged in'}), 401  # Unauthorized if no user is logged in
 
     # Extract individual data fields from the received JSON
+    anchor_id = data.get('anchor_id') # user-defined
     anchor_name = data.get('anchor_name')
     latitude = data.get('latitude')
     longitude = data.get('longitude')
 
     # Check if all required data was received
-    if anchor_name and latitude and longitude:
+    if anchor_id and anchor_name and latitude and longitude:
         try:
             # Insert the received anchor data into the 'anchors' table
             con = sqlite3.connect('users.db')
             c = con.cursor()
-            c.execute("""INSERT INTO anchors (user_id, anchor_name, latitude, longitude, created_at) 
-                         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""",
-                      (user_id, anchor_name, latitude, longitude))
+            c.execute("""INSERT INTO anchors (anchor_id, user_id, anchor_name, latitude, longitude, created_at) 
+                         VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+                      (anchor_id, user_id, anchor_name, latitude, longitude))
             con.commit()
 
             # Get the ID of the newly inserted anchor
-            anchor_id = c.lastrowid  # This is the server-generated ID (integer)
+            anchor_id = c.lastrowid
 
             con.close()
 
@@ -179,26 +180,27 @@ def edit_anchor():
 
     # Extract data from incoming frontend payload
     data = request.get_json()
+    anchor_id = data.get('anchor_id')
     anchor_name = data.get('anchor_name')
     new_name = data.get('new_anchor_name')
     new_latitude = data.get('latitude')
     new_longitude = data.get('longitude')
 
     # Ensure we got everything needed
-    if anchor_name and new_name and new_latitude and new_longitude:
+    if anchor_id and anchor_name and new_name and new_latitude and new_longitude:
         try:
             # Connect to db
             con = sqlite3.connect('users.db')
             c = con.cursor()
 
             # Fetch the anchor's current details
-            c.execute("SELECT * FROM anchors WHERE anchor_name=? and user_id=?", (anchor_name, user_id))
+            c.execute("SELECT * FROM anchors WHERE anchor_id=? and user_id=?", (anchor_id, user_id))
             anchor = c.fetchone()
 
             if anchor:  # make sure its a valid in 
                 # Update anchor in the database
-                c.execute("""UPDATE anchors SET anchor_name = ?, latitude = ?, longitude = ?, created_at = CURRENT_TIMESTAMP
-                    WHERE anchor_name = ? and user_id = ?""", (new_name, new_latitude, new_longitude, anchor_name, user_id))
+                c.execute("""UPDATE anchors SET anchor_id = ?, anchor_name = ?, latitude = ?, longitude = ?, created_at = CURRENT_TIMESTAMP
+                    WHERE anchor_name = ? and user_id = ?""", (anchor_id, new_name, new_latitude, new_longitude, anchor_name, user_id))
                 con.commit()
                 con.close()
                 return jsonify({'message': 'Anchor updated successfully'}), 200
@@ -356,39 +358,87 @@ def add_tag_location():
     except Exception as e:
         return jsonify({'error': f'Error occurred while adding tag location: {str(e)}'}), 500
 
-@app.route('/add_tag_from_tcp', methods=['POST'])
+
+@app.route('/add_tag_tcp', methods=['POST'])
 def add_tag_from_tcp():
-    try:
-        # Extract data from the incoming JSON request
-        data = request.get_json()
+    # Get JSON data from the TCP client
+    data = request.json
 
-        # Get user_id from session (user is logged in)
-        user_id = session.get('user_id')
-        if user_id is None:
-            return jsonify({'error': 'User not logged in'}), 401  # Unauthorized if no user is logged in
+    if not data:
+        return jsonify({"message": "No data received or data is not valid JSON."}), 400
 
-        tag_name = data.get('tag_name')
-        latitude = data.get('latitude')
-        longitude = data.get('longitude')
-        tag_id = data.get('tag_id')
+    tag_name = data.get('tag_name')
+    x_offset = data.get('x_offset')   # Local X-position (meters)
+    y_offset = data.get('y_offset')    # Local Y-position (meters)
+    user_id = data.get('user_id')
+    anchor_ids = data.get('anchor_ids')     # List of anchor IDs used for trilateration
 
-        # Check if the data is valid
-        if not tag_name or latitude is None or longitude is None or tag_id is None:
-            return jsonify({'error': 'Missing required data (tag_id, tag_name, latitude, longitude)'}), 400
+    
 
-        # Update the tag data in the 'tags' table (assuming you have a 'tags' table and 'tag_id' column)
-        con = sqlite3.connect('users.db')
-        c = con.cursor()
-        c.execute("""UPDATE tags SET tag_name = ?, latitude = ?, longitude = ? WHERE tag_id = ?""", 
-                  (tag_name, latitude, longitude, tag_id))
+    # Connect to the SQLite database
+    con = sqlite3.connect('users.db')
+    cur = con.cursor()
+
+    # Retreive the anchor's coordinates from the database based on the anchor_ids
+    anchors = []
+    for anchor_id in anchor_ids:
+        cur.execute("SELECT * FROM anchors WHERE anchor_id = ?", (anchor_id,))
+        anchor_data = cur.fetchone()
+        if anchor_data:
+            anchors.append({
+                'id': anchor_data[0], # anchor_id
+                'latitude': anchor_data[3], # latitude
+                'longitude': anchor_data[4] # longitude
+            })
+    if len(anchors) != 3:
+        return jsonify({"message": "One or more anchors not found in the database."}), 400
+    
+    # Calculate the tag's latitude and longitude based on the offsets and anchors
+    # Using the first anchor as reference point
+    anchor0 = anchors[0]
+
+    # Add the offset to the first anchor's coordinates
+    tag_latitude = anchor0['latitude'] + (y_offset / 111320)
+    tag_longitude = anchor0['longitude'] + (x_offset / (11320 * math.cos(math.radians(anchor0['latitude']))))
+    
+
+    # Check if the tag already exists in the tags table by tag_name
+    cur.execute("SELECT * FROM tags WHERE tag_name = ?", (tag_name,))
+    existing_tag = cur.fetchone()
+
+    if existing_tag:
+        # Tag exists, update latitude and longitude
+        cur.execute("""
+            UPDATE tags
+            SET latitude = ?, longitude = ?
+            WHERE tag_name = ?
+        """, (tag_latitude, tag_longitude, tag_name))
+        message = "Tag updated successfully!"
+    else:
+        # Tag doesn't exist, add a new tag
+        cur.execute("""
+            INSERT INTO tags (tag_name, latitude, longitude)
+            VALUES (?, ?, ?)
+        """, (tag_name, tag_latitude, tag_longitude))
         con.commit()
-        con.close()
+        message = "New tag added successfully!"
 
-        return jsonify({'message': 'Tag updated successfully'}), 200
+    # Retrieve the tag_id of the newly inserted or updated tag
+    cur.execute("SELECT tag_id FROM tags WHERE tag_name = ?", (tag_name,))
+    tag_id = cur.fetchone()[0]  # Fetch the tag_id after insert or update
 
-    except Exception as e:
-        return jsonify({'error': f'Error occurred while updating tag: {str(e)}'}), 500
+    # Save the location into the tag_locations table
+    cur.execute("""
+        INSERT INTO tag_locations (tag_id, tag_name, latitude, longitude, mode)
+        VALUES (?, ?, ?, ?, ?)
+    """, (tag_id, tag_name, tag_latitude, tag_longitude, "TCP"))
 
+    # Commit the transaction and close the connection
+    con.commit()
+    con.close()
+
+    # Send response
+    return jsonify({"message": message, "tag": tag_name, "latitude": latitude, "longitude": longitude})
 
 
 
@@ -505,23 +555,23 @@ def delete_tag():
 
 # Function needed to find a tag's gps coordinates
 # Assumes the grid is in meters, and the location of the anchor is in lat, lon format
-def convert_to_gps(anchor_lat, anchor_lon, x_offset, y_offset):
-    # Earth radius in meters
-    R = 6371000  
+# def convert_to_gps(anchor_lat, anchor_lon, x_offset, y_offset):
+#     # Earth radius in meters
+#     R = 6371000  
 
-    # Convert latitude and longitude to radians
-    lat_rad = math.radians(anchor_lat)
-    lon_rad = math.radians(anchor_lon)
+#     # Convert latitude and longitude to radians
+#     lat_rad = math.radians(anchor_lat)
+#     lon_rad = math.radians(anchor_lon)
 
-    # Calculate new latitude and longitude based on the offsets (in meters)
-    new_lat = lat_rad + (y_offset / R)
-    new_lon = lon_rad + (x_offset / (R * math.cos(math.pi * lat_rad / 180)))
+#     # Calculate new latitude and longitude based on the offsets (in meters)
+#     new_lat = lat_rad + (y_offset / R)
+#     new_lon = lon_rad + (x_offset / (R * math.cos(math.pi * lat_rad / 180)))
 
-    # Convert back to degrees
-    new_lat = math.degrees(new_lat)
-    new_lon = math.degrees(new_lon)
+#     # Convert back to degrees
+#     new_lat = math.degrees(new_lat)
+#     new_lon = math.degrees(new_lon)
 
-    return new_lat, new_lon
+#     return new_lat, new_lon
 
 # Acquire a Tag's most recent location
 @app.route('/get_tag_location', methods=['GET'])
