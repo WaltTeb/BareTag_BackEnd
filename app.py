@@ -204,7 +204,7 @@ def edit_anchor():
 def get_anchors():
     try:
         # ✅ Get user_id from session
-        user_id = session.get('user_id')
+        user_id = session.get('user_id') or request.args.get('user_id')
 
         if not user_id:
             return jsonify({'error': 'User not logged in'}), 401  # Unauthorized
@@ -281,29 +281,6 @@ def delete_anchor():
 
 
 
-
-
-
-
-
-# Get Anchor for the serial monitor 
-# Function to get user_id for a given tag_id
-def get_user_id_from_tag(tag_id):
-    conn = sqlite3.connect('users.db')  
-    cursor = conn.cursor()
-
-    # Fetch the user_id associated with the tag_id
-    cursor.execute("SELECT user_id FROM tags WHERE tag_id = ?", (tag_id,))
-    user = cursor.fetchone()
-    
-    conn.close()
-    
-    if user:
-        return user[0]  # Return the user_id
-    return None  # If no user found for the tag_id, return None
-
-
-
 # —————————————————————————————————————————————————————— TAGS ——————————————————————————————————————————————————————
 
 
@@ -377,39 +354,13 @@ def add_tag_from_tcp():
         return jsonify({"message": "No data received or data is not valid JSON."}), 400
 
     tag_name = data.get('tag_name')
-    x_offset = data.get('x_offset')   # Local X-position (meters)
-    y_offset = data.get('y_offset')    # Local Y-position (meters)
+    tag_latitude = data.get('latitude')  # Latitude of the tag
+    tag_longitude = data.get('longitude')  # Longitude of the tag
     user_id = data.get('user_id')
-    anchor_ids = data.get('anchor_ids')     # List of anchor IDs used for trilateration
-
-    
 
     # Connect to the SQLite database
     con = sqlite3.connect('users.db')
     cur = con.cursor()
-
-    # Retreive the anchor's coordinates from the database based on the anchor_ids
-    anchors = []
-    for anchor_id in anchor_ids:
-        cur.execute("SELECT * FROM anchors WHERE anchor_id = ?", (anchor_id,))
-        anchor_data = cur.fetchone()
-        if anchor_data:
-            anchors.append({
-                'id': anchor_data[0], # anchor_id
-                'latitude': anchor_data[3], # latitude
-                'longitude': anchor_data[4] # longitude
-            })
-    if len(anchors) != 3:
-        return jsonify({"message": "One or more anchors not found in the database."}), 400
-    
-    # Calculate the tag's latitude and longitude based on the offsets and anchors
-    # Using the first anchor as reference point
-    anchor0 = anchors[0]
-
-    # Add the offset to the first anchor's coordinates
-    tag_latitude = anchor0['latitude'] + (y_offset / 111320)
-    tag_longitude = anchor0['longitude'] + (x_offset / (11320 * math.cos(math.radians(anchor0['latitude']))))
-    
 
     # Check if the tag already exists in the tags table by tag_name
     cur.execute("SELECT * FROM tags WHERE tag_name = ?", (tag_name,))
@@ -423,6 +374,7 @@ def add_tag_from_tcp():
             WHERE tag_name = ?
         """, (user_id, tag_latitude, tag_longitude, tag_name))
         message = "Tag updated successfully!"
+
     else:
         # Tag doesn't exist, add a new tag
         cur.execute("""
@@ -448,7 +400,6 @@ def add_tag_from_tcp():
 
     # Send response
     return jsonify({"message": message, "tag": tag_name, "latitude": tag_latitude, "longitude": tag_longitude})
-
 
 
 
@@ -571,46 +522,43 @@ def get_tag_location():
     if user_id is None:
         return jsonify({'error': 'User not logged in'}), 401  # Unauthorized if no user is logged in
 
+    tag_name = request.args.get('tag_name')
+    if not tag_name:
+        return jsonify({'error': 'Tag name is required'}), 400
+
     try:
         # Connect to Database
         con = sqlite3.connect('users.db')
         c = con.cursor()
 
-        # Fetch the most recent location for each tag of the user
+        # Fetch the latitude and longitude directly from the tags table for the given tag_name and user_id
         c.execute("""
-            SELECT t.tag_id, t.tag_name, tl.latitude, tl.longitude, tl.timestamp 
-            FROM tags t
-            JOIN tag_locations tl ON t.tag_id = tl.tag_id
-            WHERE t.user_id = ?
-            AND tl.timestamp = (SELECT MAX(timestamp) FROM tag_locations WHERE tag_id = tl.tag_id)
-            """, (user_id,))
+            SELECT latitude, longitude
+            FROM tags
+            WHERE user_id = ? AND tag_name = ?
+            """, (user_id, tag_name))
 
-        # Fetch all the results
-        recent_locations = c.fetchall()
+        # Fetch the result
+        tag_location = c.fetchone()
         con.close()
 
-        # If no tag locations are found, return an empty list or an appropriate message
-        if not recent_locations:
-            return jsonify({'recent_tag_locations': [], 'message': 'No tag locations found for the user'}), 200
-
+        # If no location is found, return an appropriate message
+        if not tag_location:
+            return jsonify({'message': 'No location found for the specified tag name'}), 404
 
         # Prepare the response
-        result = []
-        for loc in recent_locations:
-            result.append({
-                'tag_id': loc[0],
-                'tag_name': loc[1],
-                'latitude': loc[2],
-                'longitude': loc[3],
-                'timestamp': loc[4]
-            })
+        result = {
+            'tag_name': tag_name,
+            'latitude': tag_location[0],
+            'longitude': tag_location[1]
+        }
 
-        # Return the most recent locations
-        print(f"🔍 Query Result: {recent_locations}")  # Add this before returning JSON
-        return jsonify({'recent_tag_locations': result}), 200
+        # Return the tag's location
+        return jsonify({'tag_location': result}), 200
 
     except Exception as e:
-        return jsonify({'error': f'Error occurred while fetching recent tag locations: {str(e)}'}), 500
+        return jsonify({'error': f'Error occurred while fetching tag location: {str(e)}'}), 500
+
     
 
 # Request 24-hour history of a tag

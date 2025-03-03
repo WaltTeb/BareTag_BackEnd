@@ -3,6 +3,7 @@ import json
 from Anchor import Anchor
 import socket
 import requests
+import math
 
 def all_anchors_updated(anchors):
     for anchor in anchors:
@@ -36,22 +37,88 @@ def trilaterate(anchors):
     return (X, Y)
 
 def get_anchors_from_server(user_id):
-    response = requests.get(f'http://localhost:5000/get_user_anchors/{}')
+    # Get request to Flask server to fetch anchors for user_id
+    response = requests.get(f'http://localhost:5000/get_anchors?user_id={user_id}')
+
+    if response.status_code == 200:
+        # Extract list of anchors from the server response
+        data = response.json()
+        anchors_data = data.get("anchors", []) # anchors is key
+        return anchors_data
+    else:
+        print(f"Error fetching anchors: {response.status_code}")
+        return []
+    
+
+# Helper function to create our grid based on x/y meter positions
+def lat_lon_to_meters(lat1, lon1, lat2, lon2):
+    # Approximate Earth radius in kilometers
+    R = 6371
+    lat1 = math.radians(lat1)
+    lon1 = math.radians(lon1)
+    lat2 = math.radians(lat2)
+    lon2 = math.radians(lon2)
+
+    # Haversine formula to calculate distance between two lat/lon points
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+
+    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+
+    distance = R * c * 1000  # Distance in meters
+    return distance
+
+def meters_to_lat_long(x_offset, y_offset, reference_anchor):
+    # Convert the given x and y offsets (meters) into latitude and longitude relative to (0,0) anchor
+
+    # x offset to longitude diff
+    lon_offset = x_offset / (111320 * math.cos(math.radians(reference_anchor.latitude)))
+
+    # Convert y to latitude difference
+    lat_offset = y_offset / 111320
+
+    # Calculate new latitude and longitude
+    new_latitude = reference_anchor.latitude + lat_offset
+    new_longitude = reference_anchor.longitude + lon_offset
+
+    return new_latitude, new_longitude
+
+
+
+  # -------------------------------------------------- RUNNING CODE -------------------------------------
 
 try:
-    with open('anchor_config.json') as config_file:
-        data = json.load(config_file)
 
-    lora_usb_port = data['lora_usb_port']
+    lora_usb_port = "/dev/ttyUSB0" # Set port manually (no more json)
+    user_id = 1
+    anchors_data = get_anchors_from_server(user_id)
 
-    anchor_list_json = data['anchors']
+    # Initialize Anchor
+
     anchor_list = []
     anchor_dict = {}
 
-    for anchor in anchor_list_json:
-        new_anchor = Anchor(anchor['anchor_id'], anchor['x_coord'], anchor['y_coord'])
+    # Find the anchor with smallest latitude and longitude
+    min_anchor = min(anchors_data, key=lambda x: (x['latitude'], x['longitude']))
+
+    # Get the minimum latitude and longitude (used for the origin point)
+    min_lat = min_anchor['latitude']
+    min_lon = min_anchor['longitude']
+
+    # Convert all anchors to x,y positions relative to the anchor with the smallest latitude
+    for anchor in anchors_data:
+        # Calculate the x and y distance from the min_lat/min_lon anchor
+        x = lat_lon_to_meters(min_lat, min_lon, anchor['latitude'], min_lon)
+        y = lat_lon_to_meters(min_lat, min_lon, min_lat, anchor['longitude'])
+
+        # Use latitude and longitude difference as x and y
+        new_anchor = Anchor(anchor['id'], x, y)
         anchor_list.append(new_anchor)
         anchor_dict[new_anchor.id] = new_anchor
+    
+    for anchor in anchor_list:
+        print(anchor)  # This will call the __str__ method of the Anchor class
 
     
     with serial.Serial(f"/dev/{lora_usb_port}", 115200, timeout=1) as ser:
@@ -66,29 +133,33 @@ try:
                     anchor_dict[recv_id].update_dist(recv_dist)
             if all_anchors_updated(anchor_list):
                 tag_location = trilaterate(anchor_list)
-                print(tag_location)
 
-            # Collect the IDs of the anchors used
-            used_anchors = [anchor_list[0].id, anchor_list[1].id, anchor_list[2].id]
+                # Convert the x, y tag_location to the latitude and longitude of the tag
+                tag_latitude, tag_longitude = meters_to_lat_long(tag_location[0], tag_location[1], min_anchor)
+                print(f"Tag Latitude {tag_latitude}, Tag Longitude: {tag_longitude}")
 
 
-            # Prepare data to send to the server
-            data_to_send = {
-                "tag_name": "NEW TAG 2",
-                "x_offset": tag_location[0], # X offset in meters
-                "y_offset": tag_location[1],  # Y offset in meters
-                "user_id": 1,   # Assume user_id is provided
-                "anchor_ids": used_anchors # Include the anchor IDs used
-            }
+                # Collect the IDs of the anchors used
+                used_anchors = [anchor_list[0].id, anchor_list[1].id, anchor_list[2].id]
 
-            # Send data to the Flask server using the requests library
-            response = requests.post('http://localhost:5000/add_tag_tcp', json=data_to_send)
 
-            # Handle the server's response
-            if response.status_code == 200:
-                print("Server Response: ", response.json())
-            else:
-                print(f"Error: {response.status_code}, {response.text}")
+                # Prepare data to send to the server
+                data_to_send = {
+                    "tag_name": "NEW TAG 2",
+                    "latitude": tag_latitude, # X offset in meters
+                    "longitude": tag_longitude,  # Y offset in meters
+                    "user_id": 1,   # Assume user_id is provided
+                    "anchor_ids": used_anchors # Include the anchor IDs used
+                }
+
+                # Send data to the Flask server using the requests library
+                response = requests.post('http://localhost:5000/add_tag_tcp', json=data_to_send)
+
+                # Handle the server's response
+                if response.status_code == 200:
+                    print("Server Response: ", response.json())
+                else:
+                    print(f"Error: {response.status_code}, {response.text}")
 
 except KeyboardInterrupt as e:
     print(f"Program quit with exception {e}")
