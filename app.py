@@ -522,10 +522,6 @@ def get_tag_location():
     if user_id is None:
         return jsonify({'error': 'User not logged in'}), 401  # Unauthorized if no user is logged in
 
-    tag_name = request.args.get('tag_name')
-    if not tag_name:
-        return jsonify({'error': 'Tag name is required'}), 400
-
     try:
         # Connect to Database
         con = sqlite3.connect('users.db')
