@@ -531,33 +531,35 @@ def get_tag_location():
         con = sqlite3.connect('users.db')
         c = con.cursor()
 
-        # Fetch the latitude and longitude directly from the tags table for the given tag_name and user_id
+        # Fetch the latitude, longitude, and tag_name for all tags of the given user_id
         c.execute("""
-            SELECT latitude, longitude
+            SELECT tag_name, latitude, longitude
             FROM tags
-            WHERE user_id = ? AND tag_name = ?
-            """, (user_id, tag_name))
+            WHERE user_id = ?
+            """, (user_id,))
 
-        # Fetch the result
-        tag_location = c.fetchone()
+        # Fetch all the results
+        tags_locations = c.fetchall()
         con.close()
 
-        # If no location is found, return an appropriate message
-        if not tag_location:
-            return jsonify({'message': 'No location found for the specified tag name'}), 404
+        # If no tags are found, return an appropriate message
+        if not tags_locations:
+            return jsonify({'message': 'No tags found for the specified user'}), 404
 
-        # Prepare the response
-        result = {
-            'tag_name': tag_name,
-            'latitude': tag_location[0],
-            'longitude': tag_location[1]
-        }
+        # Prepare the response with a list of tags and their locations
+        result = []
+        for tag in tags_locations:
+            result.append({
+                'tag_name': tag[0],
+                'latitude': tag[1],
+                'longitude': tag[2]
+            })
 
-        # Return the tag's location
-        return jsonify({'tag_location': result}), 200
+        # Return the list of tags with their locations
+        return jsonify({'tags_location': result}), 200
 
     except Exception as e:
-        return jsonify({'error': f'Error occurred while fetching tag location: {str(e)}'}), 500
+        return jsonify({'error': f'Error occurred while fetching tags location: {str(e)}'}), 500
 
     
 
