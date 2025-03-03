@@ -419,16 +419,16 @@ def add_tag_from_tcp():
         # Tag exists, update latitude and longitude
         cur.execute("""
             UPDATE tags
-            SET latitude = ?, longitude = ?
+            SET user_id = ?, latitude = ?, longitude = ?
             WHERE tag_name = ?
-        """, (tag_latitude, tag_longitude, tag_name))
+        """, (user_id, tag_latitude, tag_longitude, tag_name))
         message = "Tag updated successfully!"
     else:
         # Tag doesn't exist, add a new tag
         cur.execute("""
-            INSERT INTO tags (tag_name, latitude, longitude)
-            VALUES (?, ?, ?)
-        """, (tag_name, tag_latitude, tag_longitude))
+            INSERT INTO tags (user_id, tag_name, latitude, longitude)
+            VALUES (?, ?, ?, ?)
+        """, (user_id, tag_name, tag_latitude, tag_longitude))
         con.commit()
         message = "New tag added successfully!"
 
