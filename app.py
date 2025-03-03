@@ -514,7 +514,7 @@ def delete_tag():
         return jsonify({'error': 'Missing tag_id'}), 400  # Bad request if no tag_id is provided
 
 # Acquire a Tag's most recent location
-@app.route('/get_tag_location', methods=['GET'])
+@app.route('/get_tags', methods=['GET'])
 def get_tag_location():
     # Get user_id from session
     user_id = session.get('user_id')
