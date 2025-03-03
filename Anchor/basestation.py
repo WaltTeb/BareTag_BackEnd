@@ -38,7 +38,7 @@ def trilaterate(anchors):
 
 def get_anchors_from_server(user_id):
     # Get request to Flask server to fetch anchors for user_id
-    response = requests.get(f'http://localhost:5000/get_anchors?user_id={user_id}')
+    response = requests.get(f'http://172.24.131.25:5000/get_anchors?user_id={user_id}')
 
     if response.status_code == 200:
         # Extract list of anchors from the server response
@@ -153,7 +153,7 @@ try:
                 }
 
                 # Send data to the Flask server using the requests library
-                response = requests.post('http://localhost:5000/add_tag_tcp', json=data_to_send)
+                response = requests.post('http://172.24.131.25:5000/add_tag_tcp', json=data_to_send)
 
                 # Handle the server's response
                 if response.status_code == 200:
