@@ -282,6 +282,28 @@ def delete_anchor():
 
 
 
+
+
+
+
+# Get Anchor for the serial monitor 
+# Function to get user_id for a given tag_id
+def get_user_id_from_tag(tag_id):
+    conn = sqlite3.connect('users.db')  
+    cursor = conn.cursor()
+
+    # Fetch the user_id associated with the tag_id
+    cursor.execute("SELECT user_id FROM tags WHERE tag_id = ?", (tag_id,))
+    user = cursor.fetchone()
+    
+    conn.close()
+    
+    if user:
+        return user[0]  # Return the user_id
+    return None  # If no user found for the tag_id, return None
+
+
+
 # —————————————————————————————————————————————————————— TAGS ——————————————————————————————————————————————————————
 
 

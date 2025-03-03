@@ -35,6 +35,9 @@ def trilaterate(anchors):
 
     return (X, Y)
 
+def get_anchors_from_server(user_id):
+    response = requests.get(f'http://localhost:5000/get_user_anchors/{}')
+
 try:
     with open('anchor_config.json') as config_file:
         data = json.load(config_file)
