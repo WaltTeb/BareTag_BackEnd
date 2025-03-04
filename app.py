@@ -547,7 +547,7 @@ def get_tag_location():
         for tag in tags_locations:
             result.append({
                 'id': str(tag[0]),
-                'tag_name': tag[1],
+                'name': tag[1],
                 'latitude': tag[2],
                 'longitude': tag[3]
             })
