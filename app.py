@@ -529,7 +529,7 @@ def get_tag_location():
 
         # Fetch the latitude, longitude, and tag_name for all tags of the given user_id
         c.execute("""
-            SELECT tag_name, latitude, longitude
+            SELECT tag_id, tag_name, latitude, longitude
             FROM tags
             WHERE user_id = ?
             """, (user_id,))
@@ -546,9 +546,10 @@ def get_tag_location():
         result = []
         for tag in tags_locations:
             result.append({
-                'tag_name': tag[0],
-                'latitude': tag[1],
-                'longitude': tag[2]
+                'id': tag[0],
+                'tag_name': tag[1],
+                'latitude': tag[2],
+                'longitude': tag[3]
             })
 
         # Return the list of tags with their locations
