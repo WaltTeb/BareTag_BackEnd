@@ -208,6 +208,9 @@ def get_anchors():
 
         if not user_id:
             return jsonify({'error': 'User not logged in'}), 401  # Unauthorized
+        
+        print(f"User ID received: {user_id}")
+
 
         # ✅ Connect to SQLite database
         con = sqlite3.connect('users.db')
@@ -216,12 +219,13 @@ def get_anchors():
         # ✅ Fetch only the anchors belonging to the logged-in user
         cur.execute("SELECT anchor_id, anchor_name, latitude, longitude FROM anchors WHERE user_id=?", (user_id,))
         anchors = cur.fetchall()
+        print("Anchors fetched from DB:", anchors)  # Debug print
         con.close()
 
         # ✅ Convert data to JSON format
         anchor_list = [
             {
-                "id": str(row[0]),  # Convert ID to string
+                "id": int(row[0]),
                 "name": row[1],     # Anchor name
                 "latitude": row[2], # Latitude
                 "longitude": row[3] # Longitude
