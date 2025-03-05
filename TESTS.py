@@ -1,7 +1,8 @@
 import requests
 import math
 
-BASE_URL = "http://localhost:5000"
+#BASE_URL = "http://localhost:5000"
+BASE_URL = "http://172.24.131.25:5000"
 USERNAME = "sean"
 PASSWORD = "sean"
 

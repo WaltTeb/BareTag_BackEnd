@@ -93,7 +93,7 @@ def meters_to_lat_long(x_offset, y_offset, reference_anchor):
 try:
 
     lora_usb_port = "/dev/ttyUSB0" # Set port manually (no more json)
-    user_id = 2
+    user_id = 1
     anchors_data = get_anchors_from_server(user_id)
     print("Anchors from server:", anchors_data)
 
@@ -151,7 +151,7 @@ try:
                     "tag_name": "NEW TAG 2",
                     "latitude": tag_latitude, # X offset in meters
                     "longitude": tag_longitude,  # Y offset in meters
-                    "user_id": 2,   # Assume user_id is provided
+                    "user_id": 1,   # Assume user_id is provided
                     "anchor_ids": used_anchors # Include the anchor IDs used
                 }
 
