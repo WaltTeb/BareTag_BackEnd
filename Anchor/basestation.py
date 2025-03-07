@@ -32,7 +32,7 @@ def trilaterate(anchors):
     for anchor in anchors:
         anchor.updated = False 
 
-    return (X, Y)
+    return (X, Y)   
 
 def get_anchors_from_server(user_id):
     # Get request to Flask server to fetch anchors for user_id
