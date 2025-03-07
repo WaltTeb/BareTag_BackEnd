@@ -5,12 +5,6 @@ import socket
 import requests
 import math
 
-def all_anchors_updated(anchors):
-    for anchor in anchors:
-        if not anchor.updated:
-            return False
-    return True
-
 def trilaterate(anchors):
     x1 = anchors[0].x_coord
     x2 = anchors[1].x_coord
@@ -33,6 +27,10 @@ def trilaterate(anchors):
 
     X = (C*E - F*B) / (E*A - B*D)
     Y = (C*D - A*F) / (B*D - A*E)
+
+    # Reset the updated flag for all anchors that were updated before
+    for anchor in anchors:
+        anchor.updated = False 
 
     return (X, Y)
 
@@ -134,8 +132,17 @@ try:
                     recv_id = int(recv_data[0][5:])
                     recv_dist = float(recv_data[2])
                     anchor_dict[recv_id].update_dist(recv_dist)
-            if all_anchors_updated(anchor_list):
-                tag_location = trilaterate(anchor_list)
+
+            # Check for expired updates
+            for anchor in anchor_list:
+                if not anchor.updated_recently(threshold=10):
+                    anchor.updated = False  # Reset an anchor if not updated in last 10 sec
+
+            # List of only updated anchors to send to trilaterate
+            updated_anchors = [anchor for anchor in anchor_list if anchor.updated]
+            # Now can trilaterate after making sure 3 have been updated within 10s of each other
+            if len(updated_anchors) >= 3:
+                tag_location = trilaterate(updated_anchors)
 
                 # Convert the x, y tag_location to the latitude and longitude of the tag
                 tag_latitude, tag_longitude = meters_to_lat_long(tag_location[0], tag_location[1], min_anchor)
@@ -143,7 +150,7 @@ try:
 
 
                 # Collect the IDs of the anchors used
-                used_anchors = [anchor_list[0].id, anchor_list[1].id, anchor_list[2].id]
+                used_anchors = [updated_anchors[0].id, updated_anchors[1].id, updated_anchors[2].id]
 
 
                 # Prepare data to send to the server
