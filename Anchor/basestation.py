@@ -5,7 +5,7 @@ import socket
 import requests
 import math
 
-def trilaterate(anchors):
+def trilaterate(anchors, distances):
     x1 = anchors[0].x_coord
     x2 = anchors[1].x_coord
     x3 = anchors[2].x_coord
@@ -14,9 +14,9 @@ def trilaterate(anchors):
     y2 = anchors[1].y_coord
     y3 = anchors[2].y_coord
 
-    r1 = anchors[0].get_dist()
-    r2 = anchors[1].get_dist()
-    r3 = anchors[2].get_dist()
+    r1 = distances[0]
+    r2 = distances[1]
+    r3 = distances[2]
 
     A = -2*x1 + 2*x2
     B = -2*y1 + 2*y2
@@ -28,11 +28,9 @@ def trilaterate(anchors):
     X = (C*E - F*B) / (E*A - B*D)
     Y = (C*D - A*F) / (B*D - A*E)
 
-    # Reset the updated flag for all anchors that were updated before
-    for anchor in anchors:
-        anchor.updated = False 
-
     return (X, Y)   
+
+# --------------------------------------- INTERACTING WITH BACKEND TO FETCH DATA --------------------------------
 
 def get_anchors_from_server(user_id):
     # Get request to Flask server to fetch anchors for user_id
@@ -47,27 +45,20 @@ def get_anchors_from_server(user_id):
     else:
         print(f"Error fetching anchors: {response.status_code}")
         return []
-    
-"""""
-# Helper function to create our grid based on x/y meter positions
-def lat_lon_to_meters(lat1, lon1, lat2, lon2):
-    # Approximate Earth radius in kilometers
-    R = 6371
-    lat1 = math.radians(lat1)
-    lon1 = math.radians(lon1)
-    lat2 = math.radians(lat2)
-    lon2 = math.radians(lon2)
 
-    # Haversine formula to calculate distance between two lat/lon points
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
+def get_tags_from_server(user_id):
+    # Get request to Flask server to fetch the tags of a user
+    response = requests.get(f'http://172.24.131.25:5000/get_tags?user_id={user_id}')
 
-    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    if response.status_code == 200: # GOOD
+        data = response.json()
+        tags_data = data.get("tags_location", []) 
+        tag_ids = [tag['id'] for tag in tags_data] # Extracts all Tag IDs under a user profile
+    else:
+        print(f"Error fetching tags: {response.status_code}")
+        return []
 
-    distance = R * c * 1000  # Distance in meters
-    return distance
-"""
+# ----------------------------------------------- Conversion ----------------------------------
 
 def meters_to_lat_long(x_offset, y_offset, reference_anchor):
     # Convert the given x and y offsets (meters) into latitude and longitude relative to (0,0) anchor
@@ -86,7 +77,7 @@ def meters_to_lat_long(x_offset, y_offset, reference_anchor):
 
 
 
-  # -------------------------------------------------- RUNNING CODE -------------------------------------
+  # -------------------------------------------------- ESTABLISHING ANCHOR COORDINATE GRID  -------------------------------------
 
 try:
 
@@ -121,55 +112,85 @@ try:
     for anchor in anchor_list:
         print(anchor)  # This will call the __str__ method of the Anchor class, for debugging
 
+    tags_list = get_anchors_from_server(user_id)
+    if not tags_list:
+        print(f"No tags found for user {user_id}. Exiting")
+        exit()
+    # Check to see what tags we got from the server
+    print(f"Tags to ping: {tags_list}")
     
+    # ----------------------------------------------------------- ACQUIRING TAG LOCATIONS ---------------------------------------------------------------------------------
+    # Dictionary to store tag measurements (key: tag_id, value: {anchor_id: distance})
+    tag_measurements = {tag['id']: {} for tag in tags_list}
+
     with serial.Serial(f"/dev/{lora_usb_port}", 115200, timeout=1) as ser:
+        # Send a message to every anchor from the Base Station the IDs of the Tags we are looking for
+        for anchor in anchor_list: 
+            # Construct message
+            message = f"+SEND,{','.join(map(str, tags_list))}\n"
+            ser.write(message.encode()) # Send message over serial
+            print(f"Sent to anchor {anchor.id}: {message.strip()}")
+
+
+        tag_distances = {}
+        # Receiving distance measurements from anchors
         while 1:
             line = ser.readline()
             if len(line) > 3:
                 line_str = line.decode("utf-8")[:-2]
                 if line_str[:4] == "+RCV":
-                    recv_data = line_str.split(',')
-                    recv_id = int(recv_data[0][5:])
-                    recv_dist = float(recv_data[2])
-                    anchor_dict[recv_id].update_dist(recv_dist)
+                    recv_data = line_str.split(',') 
+                    recv_anc_id = int(recv_data[0][5:])   # Anchor that you are receiving measurement from
+                    recv_dist = float(recv_data[2])     # Distance from the tag to (specific) anchor
 
-            # Check for expired updates
-            for anchor in anchor_list:
-                if not anchor.updated_recently(threshold=10):
-                    anchor.updated = False  # Reset an anchor if not updated in last 10 sec
+                    # Walter need this sent in the packet
+                    recv_tag_id = int(recv_data[3])    # Need to know the ID of the tag its measured to
 
-            # List of only updated anchors to send to trilaterate
-            updated_anchors = [anchor for anchor in anchor_list if anchor.updated]
-            # Now can trilaterate after making sure 3 have been updated within 10s of each other
-            if len(updated_anchors) >= 3:
-                tag_location = trilaterate(updated_anchors)
+                    # Not sure if we need this anymore , do not think so
+                    anchor_dict[recv_anc_id].update_dist(recv_dist, recv_tag_id) # Saves this in an dictionary of anchors and received distances
+                    tag_measurements[recv_tag_id][recv_tag_id] = recv_dist # Update tag's measurement
 
-                # Convert the x, y tag_location to the latitude and longitude of the tag
-                tag_latitude, tag_longitude = meters_to_lat_long(tag_location[0], tag_location[1], min_anchor)
-                print(f"Tag Latitude {tag_latitude}, Tag Longitude: {tag_longitude}") # debugging
+            # Debugging output
+            print(f"Received from Anchor {recv_anc_id}: Tag {recv_tag_id} at Distance {recv_dist}m")
+
+            # Check if tags have measurements from 3 different anchors
+            for tag_id, measurements in tag_measurements.items():
+                if len(measurements) >= 3:
+                    # Get the 3 anchors that have measurements for this tag
+                    anchors_with_distances = [anchor_dict[anchor_id] for anchor_id in measurements.keys()]
+                    distances = list(measurements.values())
+                    tag_location = trilaterate(anchors_with_distances, distances)
+
+                    # Convert the x, y tag_location to the latitude and longitude of the tag
+                    tag_latitude, tag_longitude = meters_to_lat_long(tag_location[0], tag_location[1], min_anchor)
+                    print(f"Tag Latitude {tag_latitude}, Tag Longitude: {tag_longitude}") # debugging
 
 
-                # Collect the IDs of the anchors used
-                used_anchors = [updated_anchors[0].id, updated_anchors[1].id, updated_anchors[2].id]
+                    # Collect the IDs of the anchors used
+                    used_anchors = list(measurements.keys())
 
 
-                # Prepare data to send to the server
-                data_to_send = {
-                    "tag_name": "NEW TAG 2",
-                    "latitude": tag_latitude, # X offset in meters
-                    "longitude": tag_longitude,  # Y offset in meters
-                    "user_id": 1,   # Assume user_id is provided
-                    "anchor_ids": used_anchors # Include the anchor IDs used
-                }
+                    # Prepare data to send to the server
+                    data_to_send = {
+                        "tag_name": f"Tag {tag_id}",
+                        "latitude": tag_latitude, # X offset in meters
+                        "longitude": tag_longitude,  # Y offset in meters
+                        "user_id": 1,   # Assume user_id is provided
+                        "anchor_ids": used_anchors # Include the anchor IDs used
+                    }
 
-                # Send data to the Flask server using the requests library
-                response = requests.post('http://172.24.131.25:5000/add_tag_tcp', json=data_to_send)
+                    # Send data to the Flask server using the requests library
+                    response = requests.post('http://172.24.131.25:5000/add_tag_tcp', json=data_to_send)
 
-                # Handle the server's response
-                if response.status_code == 200:
-                    print("Server Response: ", response.json())
-                else:
-                    print(f"Error: {response.status_code}, {response.text}")
+                    # Handle the server's response
+                    if response.status_code == 200:
+                        print("Server Response: ", response.json())
+                    else:
+                        print(f"Error: {response.status_code}, {response.text}")
+                    
+                    # RESET the measurements for a tag after performing trilateration on it
+                    print(f"Resetting measurements for Tag {tag_id}")
+                    tag_measurements[tag_id] = {} # Clear measurements for the tag
 
 except KeyboardInterrupt as e:
     print(f"Program quit with exception {e}")
