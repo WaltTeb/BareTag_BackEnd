@@ -150,10 +150,12 @@ try:
                 if line_str[:4] == "+RCV":
                     recv_data = line_str.split(',') 
                     recv_anc_id = int(recv_data[0][5:])   # Anchor that you are receiving measurement from
-                    recv_dist = float(recv_data[2])     # Distance from the tag to (specific) anchor
+                    recv_tag_info = recv_data[2]    # Distance from the tag to (specific) anchor and tag ID
+                    recv_tag_info = recv_tag_info.split(':')
+                    recv_dist = int(recv_tag_info[0])
 
                     # Walter need this sent in the packet
-                    recv_tag_id = int(recv_data[3])    # Need to know the ID of the tag its measured to
+                    recv_tag_id = int(recv_tag_info[1])    # Need to know the ID of the tag its measured to
 
                     # Not sure if we need this anymore , do not think so
                     anchor_dict[recv_anc_id].update_dist(recv_dist, recv_tag_id) # Saves this in an dictionary of anchors and received distances
