@@ -4,6 +4,7 @@ from Anchor import Anchor
 import socket
 import requests
 import math
+import codecs
 
 def trilaterate(anchors):
     x1 = anchors[0].x_coord
@@ -73,14 +74,20 @@ def meters_to_lat_long(x_offset, y_offset, reference_anchor):
     # Convert the given x and y offsets (meters) into latitude and longitude relative to (0,0) anchor
 
     # x offset to longitude diff
-    lon_offset = x_offset / (111320 * math.cos(math.radians(reference_anchor.latitude)))
+    # lon_offset = x_offset / (111320 * math.cos(math.radians(reference_anchor.latitude)))
+    lon_offset = x_offset / (111320 * math.cos(math.radians(reference_anchor["latitude"])))
+
 
     # Convert y to latitude difference
     lat_offset = y_offset / 111320
 
     # Calculate new latitude and longitude
-    new_latitude = reference_anchor.latitude + lat_offset
-    new_longitude = reference_anchor.longitude + lon_offset
+    # new_latitude = reference_anchor.latitude + lat_offset
+    # new_longitude = reference_anchor.longitude + lon_offset
+
+    new_latitude = reference_anchor["latitude"] + lat_offset
+    new_longitude = reference_anchor["longitude"] + lon_offset
+
 
     return new_latitude, new_longitude
 
@@ -90,7 +97,7 @@ def meters_to_lat_long(x_offset, y_offset, reference_anchor):
 
 try:
 
-    lora_usb_port = "/dev/ttyUSB0" # Set port manually (no more json)
+    lora_usb_port = "ttyUSB0" # Set port manually (no more json)
     user_id = 1
     anchors_data = get_anchors_from_server(user_id)
     print("Anchors from server:", anchors_data)
@@ -102,6 +109,7 @@ try:
 
     # Find the anchor with smallest latitude and longitude
     min_anchor = min(anchors_data, key=lambda x: (x['latitude'], x['longitude']))
+    print("min anchor type:", type(min_anchor))
 
     # Get the minimum latitude and longitude (used for the origin point)
     min_lat = min_anchor['latitude']
@@ -122,12 +130,14 @@ try:
         print(anchor)  # This will call the __str__ method of the Anchor class, for debugging
 
     
-    with serial.Serial(f"/dev/{lora_usb_port}", 115200, timeout=1) as ser:
+    with serial.Serial(f"/dev/{lora_usb_port}", 57600, timeout=1) as ser:
         while 1:
             line = ser.readline()
             if len(line) > 3:
+                print(line)
                 line_str = line.decode("utf-8")[:-2]
                 if line_str[:4] == "+RCV":
+
                     recv_data = line_str.split(',')
                     recv_id = int(recv_data[0][5:])
                     recv_dist = float(recv_data[2])
