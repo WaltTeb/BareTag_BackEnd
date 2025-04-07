@@ -521,7 +521,7 @@ def delete_tag():
 @app.route('/get_tags', methods=['GET'])
 def get_tag_location():
     # Get user_id from session
-    user_id = session.get('user_id')
+    user_id = session.get('user_id') or request.args.get('user_id')
 
     if user_id is None:
         return jsonify({'error': 'User not logged in'}), 401  # Unauthorized if no user is logged in

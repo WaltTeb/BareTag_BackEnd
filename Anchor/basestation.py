@@ -120,7 +120,7 @@ try:
     for anchor in anchor_list:
         print(anchor)  # This will call the __str__ method of the Anchor class, for debugging
 
-    tags_list = get_anchors_from_server(user_id)
+    tags_list = get_tags_from_server(user_id)
     if not tags_list:
         print(f"No tags found for user {user_id}. Exiting")
         exit()

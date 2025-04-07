@@ -45,6 +45,23 @@ def add_anchor(anchor_id, anchor_name, latitude, longitude, cookies):
     else:
         print(f"Failed to add anchor {anchor_id}:", response.json())
 
+# Function to add a tag from TCP
+def add_tag(tag_name, latitude, longitude, user_id, cookies):
+    response = requests.post(
+        f"{BASE_URL}/add_tag_tcp",
+        json={
+            "tag_name": tag_name,
+            "latitude": latitude,
+            "longitude": longitude,
+            "user_id": user_id,
+        },
+        cookies=cookies,  # Pass session cookies
+    )
+    if response.status_code == 200:
+        print(f"Tag '{tag_name}' added successfully!")
+    else:
+        print(f"Failed to add tag '{tag_name}':", response.json())
+
 # Convert 10 meters to degrees (approx.)
 METERS_TO_DEGREES_LAT = 10 / 111320  # 1 degree lat = ~111.32 km
 METERS_TO_DEGREES_LON = 10 / (111320 * math.cos(math.radians(42.3732))) 
@@ -61,6 +78,11 @@ if __name__ == "__main__":
         delete_anchor("Anchor 3", cookies)
 
         # Add new anchors with IDs 1, 2, 3
-        add_anchor(1, "Anchor 1", lat1, lon1, cookies)
-        add_anchor(2, "Anchor 2", lat1 + METERS_TO_DEGREES_LAT, lon1, cookies)  # +10m latitude
+        add_anchor(60, "Anchor 1", lat1, lon1, cookies)
+        add_anchor(90, "Anchor 2", lat1 + METERS_TO_DEGREES_LAT, lon1, cookies)  # +10m latitude
         add_anchor(3, "Anchor 3", lat1, lon1 + METERS_TO_DEGREES_LON, cookies)  # +10m longitude
+
+        # Register two tags after adding the anchors
+        user_id = 1  # Assuming you have a valid user_id; replace with actual user_id if needed.
+        add_tag("Tag 1", lat1 + METERS_TO_DEGREES_LAT, lon1, user_id, cookies)  # Tag 1 at +10m latitude
+        add_tag("Tag 2", lat1, lon1 + METERS_TO_DEGREES_LON, user_id, cookies)  # Tag 2 at +10m longitude
