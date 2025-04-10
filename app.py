@@ -127,16 +127,17 @@ def add_anchor_to_dashboard():
     anchor_name = data.get('anchor_name')
     latitude = data.get('latitude')
     longitude = data.get('longitude')
+    altitude = data.get('altitude')
 
     # Check if all required data was received
-    if anchor_id and anchor_name and latitude and longitude:
+    if anchor_id and anchor_name and latitude and longitude and altitude:
         try:
             # Insert the received anchor data into the 'anchors' table
             con = sqlite3.connect('users.db')
             c = con.cursor()
-            c.execute("""INSERT INTO anchors (anchor_id, user_id, anchor_name, latitude, longitude, created_at) 
+            c.execute("""INSERT INTO anchors (anchor_id, user_id, anchor_name, latitude, longitude, altitude, created_at) 
                          VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
-                      (anchor_id, user_id, anchor_name, latitude, longitude))
+                      (anchor_id, user_id, anchor_name, latitude, longitude, altitude))
             con.commit()
 
             # Get the ID of the newly inserted anchor
@@ -151,7 +152,7 @@ def add_anchor_to_dashboard():
             return jsonify({'error': f'Error occurred while adding anchor: {str(e)}'}), 500
     else:
         # If any of the required fields are missing, return a bad request error
-        return jsonify({'error': 'Missing data (anchor_name, latitude, or longitude)'}), 400
+        return jsonify({'error': 'Missing data (anchor_name, latitude, longitude, or altitude)'}), 400
 
 
 
@@ -172,9 +173,10 @@ def edit_anchor():
     new_name = data.get('new_anchor_name')
     new_latitude = data.get('latitude')
     new_longitude = data.get('longitude')
+    new_altitude = data.get('altitude')
 
     # Ensure we got everything needed
-    if anchor_id and anchor_name and new_name and new_latitude and new_longitude:
+    if anchor_id and anchor_name and new_name and new_latitude and new_longitude and new_altitude:
         try:
             # Connect to db
             con = sqlite3.connect('users.db')
@@ -186,8 +188,8 @@ def edit_anchor():
 
             if anchor:  # make sure its a valid in 
                 # Update anchor in the database
-                c.execute("""UPDATE anchors SET anchor_id = ?, anchor_name = ?, latitude = ?, longitude = ?, created_at = CURRENT_TIMESTAMP
-                    WHERE anchor_name = ? and user_id = ?""", (anchor_id, new_name, new_latitude, new_longitude, anchor_name, user_id))
+                c.execute("""UPDATE anchors SET anchor_id = ?, anchor_name = ?, latitude = ?, longitude = ?, altitude = ?, created_at = CURRENT_TIMESTAMP
+                    WHERE anchor_name = ? and user_id = ?""", (anchor_id, new_name, new_latitude, new_longitude, new_altitude, anchor_name, user_id))
                 con.commit()
                 con.close()
                 return jsonify({'message': 'Anchor updated successfully'}), 200
@@ -217,7 +219,7 @@ def get_anchors():
         cur = con.cursor()
 
         # ✅ Fetch only the anchors belonging to the logged-in user
-        cur.execute("SELECT anchor_id, anchor_name, latitude, longitude FROM anchors WHERE user_id=?", (user_id,))
+        cur.execute("SELECT anchor_id, anchor_name, latitude, longitude, altitude FROM anchors WHERE user_id=?", (user_id,))
         anchors = cur.fetchall()
         print("Anchors fetched from DB:", anchors)  # Debug print
         con.close()
@@ -228,7 +230,8 @@ def get_anchors():
                 "id": int(row[0]),
                 "name": row[1],     # Anchor name
                 "latitude": row[2], # Latitude
-                "longitude": row[3] # Longitude
+                "longitude": row[3], # Longitude
+                "altitude": row[4]  # Altitude
             }
             for row in anchors
         ]
