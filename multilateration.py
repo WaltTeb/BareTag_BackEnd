@@ -53,4 +53,5 @@ if __name__=="__main__":
     anchors = fetch_anchors(user_id)
     print(anchors)
     distances = [343, 234, 123, 456]  # Should match number of anchors
+    distances = np.array(distances)
     multilat_lib.multilateration_minimum_squared(anchors,distances)
