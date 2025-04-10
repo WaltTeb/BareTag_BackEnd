@@ -37,7 +37,6 @@ def fetch_anchors(user_id, measured_distances=None):
         [row[2], row[3], row[4]]  # latitude, longitude, altitude
         for row in anchors
     ])
-    distances = np.array(measured_distances)    
 
     # Check if any tag responses (distances) are given
     if measured_distances == None:
@@ -45,6 +44,7 @@ def fetch_anchors(user_id, measured_distances=None):
     # Check if the number of anchor matches the numer of tag responses
     elif len(anchors) != len(measured_distances):
         raise ValueError(f"Anchor and distance count mismatch: {len(anchors)} anchors, {len(measured_distances)} distances")
+    distances = np.array(measured_distances)    
 
     return anchor_coords, distances
 
@@ -52,5 +52,5 @@ def fetch_anchors(user_id, measured_distances=None):
 if __name__=="__main__":
     user_id = 1
     anchors = fetch_anchors(user_id)
-    distances = [343,234,123]
-    multilat_lib(anchors,distances)
+    distances = [343, 234, 123, 456]  # Should match number of anchors
+    multilat_lib.multilateration_minimum_squared(anchors,distances)
