@@ -129,6 +129,7 @@ def add_anchor_to_dashboard():
     latitude = data.get('latitude')
     longitude = data.get('longitude')
     altitude = data.get('altitude')
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Check if all required data was received
     if anchor_id and anchor_name and latitude and longitude and altitude!=None:
@@ -138,7 +139,7 @@ def add_anchor_to_dashboard():
             c = con.cursor()
             c.execute("""INSERT INTO anchors (anchor_id, user_id, anchor_name, latitude, longitude, altitude, created_at) 
                          VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
-                      (anchor_id, user_id, anchor_name, latitude, longitude, altitude))
+                      (anchor_id, user_id, anchor_name, latitude, longitude, altitude, timestamp))
             con.commit()
 
             # Get the ID of the newly inserted anchor
