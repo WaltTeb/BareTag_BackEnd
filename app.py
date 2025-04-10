@@ -151,8 +151,23 @@ def add_anchor_to_dashboard():
             # In case of an error, return an error response
             return jsonify({'error': f'Error occurred while adding anchor: {str(e)}'}), 500
     else:
-        # If any of the required fields are missing, return a bad request error
-        return jsonify({'error': 'Missing data (anchor_name, latitude, longitude, or altitude)'}), 400
+        # Check for missing fields
+        missing_fields = []
+        if not anchor_id:
+            missing_fields.append('anchor_id')
+        if not anchor_name:
+            missing_fields.append('anchor_name')
+        if latitude is None:
+            missing_fields.append('latitude')
+        if longitude is None:
+            missing_fields.append('longitude')
+        if altitude is None:
+            missing_fields.append('altitude')
+
+        # If any required field is missing, return an error with details
+        if missing_fields:
+            return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
+
 
 
 
