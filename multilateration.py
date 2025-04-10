@@ -1,11 +1,11 @@
 import numpy as np
 import sqlite3
-from Multilateration_3D_Positioning import multilat_lib
 import sys
 import os
 
 # Add the parent directory so Python can find sibling folders
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from Multilateration_3D_Positioning import multilat_lib
 
 def fetch_anchors(user_id, measured_distances=None):
     """
