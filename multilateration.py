@@ -5,8 +5,7 @@ import sys
 import os
 
 # Add the parent directory so Python can find sibling folders
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.append(BASE_DIR)
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 def fetch_anchors(user_id, measured_distances=None):
     """
