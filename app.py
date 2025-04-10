@@ -131,7 +131,7 @@ def add_anchor_to_dashboard():
     altitude = data.get('altitude')
 
     # Check if all required data was received
-    if anchor_id and anchor_name and latitude and longitude and altitude:
+    if anchor_id and anchor_name and latitude and longitude and altitude!=None:
         try:
             # Insert the received anchor data into the 'anchors' table
             con = sqlite3.connect('users.db')
@@ -168,6 +168,7 @@ def add_anchor_to_dashboard():
         # If any required field is missing, return an error with details
         if missing_fields:
             return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
+        
         return jsonify({'error': f'Missing one of the required fields'}), 400
 
 
