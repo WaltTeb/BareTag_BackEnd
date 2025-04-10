@@ -29,7 +29,7 @@ def fetch_anchors(user_id, measured_distances=None):
     anchors = cur.fetchall()
     con.close()
 
-    print("Anchors fetched from DB:", anchors)  # Debug print
+    # print("Anchors fetched from DB:", anchors)  # Debug print
 
     # Parse the anchor data for the latitude, longitude, and altitude
     anchor_coords = np.array([
@@ -53,4 +53,5 @@ if __name__=="__main__":
     anchors = fetch_anchors(user_id)
     distances = [343, 234, 123, 456]  # Should match number of anchors
     distances = np.array(distances)
-    multilat_lib.multilateration_minimum_squared(anchors,distances)
+    tag_coords = multilat_lib.multilateration_minimum_squared(anchors,distances)
+    print(f"Tag's Latitude:{tag_coords[0]} Longitude:{tag_coords[1]} Altitude:{tag_coords[2]}")
