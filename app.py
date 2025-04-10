@@ -109,6 +109,7 @@ def registration():
         # Catch any unexpected errors and return a response
         return jsonify({'error': f'An error occurred: {str(e)}'}), 500
 
+
 # —————————————————————————————————————————————————————— ANCHORS ——————————————————————————————————————————————————————
 
 # ADD ANCHOR ROUTE
@@ -167,7 +168,7 @@ def add_anchor_to_dashboard():
         # If any required field is missing, return an error with details
         if missing_fields:
             return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
-
+        return jsonify({'error': f'Missing one of the required fields'}), 400
 
 
 
