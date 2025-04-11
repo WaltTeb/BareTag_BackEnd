@@ -404,7 +404,7 @@ def add_tag_from_tcp():
         # Tag doesn't exist, add a new tag
         cur.execute("""
             INSERT INTO tags (tag_id, user_id, tag_name, latitude, longitude)
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
         """, (tag_id, user_id, tag_name, tag_latitude, tag_longitude))
         con.commit()
         message = "New tag added successfully!"
