@@ -109,6 +109,7 @@ def registration():
         # Catch any unexpected errors and return a response
         return jsonify({'error': f'An error occurred: {str(e)}'}), 500
 
+
 # —————————————————————————————————————————————————————— ANCHORS ——————————————————————————————————————————————————————
 
 # ADD ANCHOR ROUTE
@@ -127,16 +128,17 @@ def add_anchor_to_dashboard():
     anchor_name = data.get('anchor_name')
     latitude = data.get('latitude')
     longitude = data.get('longitude')
+    altitude = data.get('altitude')
 
     # Check if all required data was received
-    if anchor_id and anchor_name and latitude and longitude:
+    if anchor_id and anchor_name and latitude and longitude and altitude!=None:
         try:
             # Insert the received anchor data into the 'anchors' table
             con = sqlite3.connect('users.db')
             c = con.cursor()
-            c.execute("""INSERT INTO anchors (anchor_id, user_id, anchor_name, latitude, longitude, created_at) 
-                         VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
-                      (anchor_id, user_id, anchor_name, latitude, longitude))
+            c.execute("""INSERT INTO anchors (anchor_id, user_id, anchor_name, latitude, longitude, altitude, created_at) 
+                         VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+                      (anchor_id, user_id, anchor_name, latitude, longitude, altitude))
             con.commit()
 
             # Get the ID of the newly inserted anchor
@@ -150,8 +152,24 @@ def add_anchor_to_dashboard():
             # In case of an error, return an error response
             return jsonify({'error': f'Error occurred while adding anchor: {str(e)}'}), 500
     else:
-        # If any of the required fields are missing, return a bad request error
-        return jsonify({'error': 'Missing data (anchor_name, latitude, or longitude)'}), 400
+        # Check for missing fields
+        missing_fields = []
+        if not anchor_id:
+            missing_fields.append('anchor_id')
+        if not anchor_name:
+            missing_fields.append('anchor_name')
+        if latitude is None:
+            missing_fields.append('latitude')
+        if longitude is None:
+            missing_fields.append('longitude')
+        if altitude is None:
+            missing_fields.append('altitude')
+
+        # If any required field is missing, return an error with details
+        if missing_fields:
+            return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
+        
+        return jsonify({'error': f'Missing one of the required fields'}), 400
 
 
 
@@ -172,9 +190,10 @@ def edit_anchor():
     new_name = data.get('new_anchor_name')
     new_latitude = data.get('latitude')
     new_longitude = data.get('longitude')
+    new_altitude = data.get('altitude')
 
     # Ensure we got everything needed
-    if anchor_id and anchor_name and new_name and new_latitude and new_longitude:
+    if anchor_id and anchor_name and new_name and new_latitude and new_longitude and new_altitude:
         try:
             # Connect to db
             con = sqlite3.connect('users.db')
@@ -186,8 +205,8 @@ def edit_anchor():
 
             if anchor:  # make sure its a valid in 
                 # Update anchor in the database
-                c.execute("""UPDATE anchors SET anchor_id = ?, anchor_name = ?, latitude = ?, longitude = ?, created_at = CURRENT_TIMESTAMP
-                    WHERE anchor_name = ? and user_id = ?""", (anchor_id, new_name, new_latitude, new_longitude, anchor_name, user_id))
+                c.execute("""UPDATE anchors SET anchor_id = ?, anchor_name = ?, latitude = ?, longitude = ?, altitude = ?, created_at = CURRENT_TIMESTAMP
+                    WHERE anchor_name = ? and user_id = ?""", (anchor_id, new_name, new_latitude, new_longitude, new_altitude, anchor_name, user_id))
                 con.commit()
                 con.close()
                 return jsonify({'message': 'Anchor updated successfully'}), 200
@@ -217,7 +236,7 @@ def get_anchors():
         cur = con.cursor()
 
         # ✅ Fetch only the anchors belonging to the logged-in user
-        cur.execute("SELECT anchor_id, anchor_name, latitude, longitude FROM anchors WHERE user_id=?", (user_id,))
+        cur.execute("SELECT anchor_id, anchor_name, latitude, longitude, altitude FROM anchors WHERE user_id=?", (user_id,))
         anchors = cur.fetchall()
         print("Anchors fetched from DB:", anchors)  # Debug print
         con.close()
@@ -228,7 +247,8 @@ def get_anchors():
                 "id": int(row[0]),
                 "name": row[1],     # Anchor name
                 "latitude": row[2], # Latitude
-                "longitude": row[3] # Longitude
+                "longitude": row[3], # Longitude
+                "altitude": row[4]  # Altitude
             }
             for row in anchors
         ]
@@ -301,12 +321,11 @@ def add_tag_location():
 
     # Get data from the request
     data = request.get_json()
-    tag_id = data.get('tag_id')
     tag_name = data.get('tag_name') 
     x_offset = data.get('x_offset')  # Relative position in meters on the X-axis
     y_offset = data.get('y_offset')  # Relative position in meters on the Y-axis
 
-    if not tag_id or tag_name or x_offset is None or y_offset is None:
+    if not tag_name or x_offset is None or y_offset is None:
         return jsonify({'error': 'Missing required data (tag_id, anchor_id, x_offset, y_offset)'}), 400
 
     try:
@@ -321,9 +340,9 @@ def add_tag_location():
         if not existing_tag:
             # If the tag doesn't exist, insert it into the tags table
             c.execute("""
-                INSERT INTO tags (tag_id, tag_name, user_id, latitude, longitude)
+                INSERT INTO tags (tag_name, user_id, latitude, longitude)
                 VALUES (?, ?, ?, ?)
-            """, (tag_id, tag_name, user_id, x_offset, y_offset))  # Default location set to 0.0, 0.0
+            """, (tag_name, user_id, x_offset, y_offset))  # Default location set to 0.0, 0.0
 
         # Fetch the anchor's GPS coordinates
         #c.execute("SELECT latitude, longitude FROM anchors WHERE id=?", (anchor_id,))
@@ -369,7 +388,7 @@ def add_tag_from_tcp():
     cur = con.cursor()
 
     # Check if the tag already exists in the tags table by tag_name
-    cur.execute("SELECT * FROM tags WHERE tag_name = ?", (tag_name,))
+    cur.execute("SELECT * FROM tags WHERE tag_id = ?", (tag_id,))
     existing_tag = cur.fetchone()
 
     if existing_tag:
@@ -391,7 +410,7 @@ def add_tag_from_tcp():
         message = "New tag added successfully!"
 
     # Retrieve the tag_id of the newly inserted or updated tag
-    cur.execute("SELECT tag_id FROM tags WHERE tag_name = ?", (tag_name,))
+    cur.execute("SELECT tag_id FROM tags WHERE tag_id = ?", (tag_id,))
     tag_id = cur.fetchone()[0]  # Fetch the tag_id after insert or update
 
     # Save the location into the tag_locations table
