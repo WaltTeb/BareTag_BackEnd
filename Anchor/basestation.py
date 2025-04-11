@@ -5,6 +5,7 @@ import socket
 import requests
 import math
 import codecs
+import time
 
 def trilaterate(anchors, distances):
     x1 = anchors[0].x_coord
@@ -55,6 +56,7 @@ def get_tags_from_server(user_id):
         data = response.json()
         tags_data = data.get("tags_location", []) 
         tag_ids = [tag['id'] for tag in tags_data] # Extracts all Tag IDs under a user profile
+        return tag_ids
     else:
         print(f"Error fetching tags: {response.status_code}")
         return []
@@ -128,16 +130,21 @@ try:
     print(f"Tags to ping: {tags_list}")
     
     # ----------------------------------------------------------- ACQUIRING TAG LOCATIONS ---------------------------------------------------------------------------------
+    
     # Dictionary to store tag measurements (key: tag_id, value: {anchor_id: distance})
-    tag_measurements = {tag['id']: {} for tag in tags_list}
+    # tag_measurements = {tag['id']: {} for tag in tags_list}
+    tag_measurements = {tag: {} for tag in tags_list}
+
 
     with serial.Serial(f"/dev/{lora_usb_port}", 57600, timeout=1) as ser:
         # Send a message to every anchor from the Base Station the IDs of the Tags we are looking for
         for anchor in anchor_list: 
             # Construct message
-            message = f"+SEND,{','.join(map(str, tags_list))}\n"
-            ser.write(message.encode()) # Send message over serial
-            print(f"Sent to anchor {anchor.id}: {message.strip()}")
+            for tag in tags_list:
+                message = f"AT+SEND={anchor.id},{len(tag)+8},NEW_TAG:{tag}\r\n"
+                ser.write(message.encode()) # Send message over serial
+                time.sleep(1)
+                print(f"Sent to anchor {anchor.id}: {message.strip()}")
 
 
         tag_distances = {}
@@ -152,17 +159,17 @@ try:
                     recv_anc_id = int(recv_data[0][5:])   # Anchor that you are receiving measurement from
                     recv_tag_info = recv_data[2]    # Distance from the tag to (specific) anchor and tag ID
                     recv_tag_info = recv_tag_info.split(':')
-                    recv_dist = int(recv_tag_info[0])
+                    recv_dist = float(recv_tag_info[0])
 
                     # Walter need this sent in the packet
-                    recv_tag_id = int(recv_tag_info[1])    # Need to know the ID of the tag its measured to
+                    recv_tag_id = recv_tag_info[1]  # Need to know the ID of the tag its measured to
 
                     # Not sure if we need this anymore , do not think so
                     anchor_dict[recv_anc_id].update_dist(recv_dist, recv_tag_id) # Saves this in an dictionary of anchors and received distances
-                    tag_measurements[recv_tag_id][recv_tag_id] = recv_dist # Update tag's measurement
+                    tag_measurements[recv_tag_id][recv_anc_id] = recv_dist # Update tag's measurement
 
-            # Debugging output
-            print(f"Received from Anchor {recv_anc_id}: Tag {recv_tag_id} at Distance {recv_dist}m")
+                    # Debugging output
+                    print(f"Received from Anchor {recv_anc_id}: Tag {recv_tag_id} at Distance {recv_dist}m")
 
             # Check if tags have measurements from 3 different anchors
             for tag_id, measurements in tag_measurements.items():

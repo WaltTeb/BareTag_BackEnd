@@ -37,6 +37,7 @@ def add_anchor(anchor_id, anchor_name, latitude, longitude, cookies):
             "anchor_name": anchor_name,
             "latitude": latitude,
             "longitude": longitude,
+            "altitude": 50
         },
         cookies=cookies,  # Pass session cookies
     )
