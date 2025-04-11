@@ -1,3 +1,5 @@
 users.db
 __pycache__/
 Anchor/__pycache__/
+flask_session/
+flask.log
