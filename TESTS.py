@@ -81,7 +81,7 @@ if __name__ == "__main__":
         # Add new anchors with IDs 1, 2, 3
         add_anchor(60, "Anchor 1", lat1, lon1, cookies)
         add_anchor(90, "Anchor 2", lat1 + METERS_TO_DEGREES_LAT, lon1, cookies)  # +10m latitude
-        add_anchor(3, "Anchor 3", lat1, lon1 + METERS_TO_DEGREES_LON, cookies)  # +10m longitude
+        add_anchor(30, "Anchor 3", lat1, lon1 + METERS_TO_DEGREES_LON, cookies)  # +10m longitude
 
         # Register two tags after adding the anchors
         user_id = 1  # Assuming you have a valid user_id; replace with actual user_id if needed.
