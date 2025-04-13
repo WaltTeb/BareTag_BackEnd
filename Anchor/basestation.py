@@ -6,6 +6,8 @@ import requests
 import math
 import codecs
 import time
+from dotenv import load_dotenv
+import os
 
 def trilaterate(anchors, distances):
     x1 = anchors[0].x_coord
@@ -36,7 +38,8 @@ def trilaterate(anchors, distances):
 
 def get_anchors_from_server(user_id):
     # Get request to Flask server to fetch anchors for user_id
-    response = requests.get(f'http://172.24.131.25:5000/get_anchors?user_id={user_id}') # might have to update this link
+    # response = requests.get(f'http://172.24.131.25:5000/get_anchors?user_id={user_id}') # might have to update this link
+    response = requests.get(f'{os.environ["BASE_URL"]}/get_anchors?user_id={user_id}') # might have to update this link
 
 
     if response.status_code == 200:
@@ -50,7 +53,9 @@ def get_anchors_from_server(user_id):
 
 def get_tags_from_server(user_id):
     # Get request to Flask server to fetch the tags of a user
-    response = requests.get(f'http://172.24.131.25:5000/get_tags?user_id={user_id}')
+    # response = requests.get(f'http://172.24.131.25:5000/get_tags?user_id={user_id}')
+    response = requests.get(f'{os.environ["BASE_URL"]}/get_tags?user_id={user_id}')
+
 
     if response.status_code == 200: # GOOD
         data = response.json()
@@ -89,6 +94,7 @@ def meters_to_lat_long(x_offset, y_offset, reference_anchor):
   # -------------------------------------------------- ESTABLISHING ANCHOR COORDINATE GRID  -------------------------------------
 
 try:
+    load_dotenv()
 
     lora_usb_port = "ttyUSB0" # Set port manually (no more json)
     user_id = 1
@@ -190,15 +196,17 @@ try:
 
                     # Prepare data to send to the server
                     data_to_send = {
-                        "tag_name": f"Tag {tag_id}",
+                        "tag_id": f"{tag_id}",
                         "latitude": tag_latitude, # X offset in meters
                         "longitude": tag_longitude,  # Y offset in meters
                         "user_id": 1,   # Assume user_id is provided
-                        "anchor_ids": used_anchors # Include the anchor IDs used
+                        # "anchor_ids": used_anchors # Include the anchor IDs used
                     }
 
                     # Send data to the Flask server using the requests library
-                    response = requests.post('http://172.24.131.25:5000/add_tag_tcp', json=data_to_send)
+                    # response = requests.post('http://172.24.131.25:5000/add_tag_tcp', json=data_to_send)
+                    response = requests.post(f"{os.environ['BASE_URL']}/add_tag_tcp", json=data_to_send)
+
 
                     # Handle the server's response
                     if response.status_code == 200:

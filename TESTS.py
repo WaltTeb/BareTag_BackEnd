@@ -1,8 +1,13 @@
 import requests
 import math
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 #BASE_URL = "http://localhost:5000"
-BASE_URL = "http://172.24.131.25:5000"
+# BASE_URL = "http://172.24.131.25:5000"
+BASE_URL = f"{os.environ['BASE_URL']}"
 USERNAME = "sean"
 PASSWORD = "sean"
 
@@ -80,8 +85,8 @@ if __name__ == "__main__":
         delete_anchor("Anchor 3", cookies)
 
         # Add new anchors with IDs 1, 2, 3
-        add_anchor(60, "Anchor 1", lat1, lon1, cookies)
-        add_anchor(90, "Anchor 2", lat1 + METERS_TO_DEGREES_LAT, lon1, cookies)  # +10m latitude
+        add_anchor(85, "Anchor 1", lat1, lon1, cookies)
+        add_anchor(60, "Anchor 2", lat1 + METERS_TO_DEGREES_LAT, lon1, cookies)  # +10m latitude
         add_anchor(30, "Anchor 3", lat1, lon1 + METERS_TO_DEGREES_LON, cookies)  # +10m longitude
 
         # Register two tags after adding the anchors

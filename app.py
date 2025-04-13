@@ -411,6 +411,7 @@ def add_tag_from_tcp():
 
     # Retrieve the tag_id of the newly inserted or updated tag
     cur.execute("SELECT tag_id FROM tags WHERE tag_id = ?", (tag_id,))
+    print(type(cur))
     tag_id = cur.fetchone()[0]  # Fetch the tag_id after insert or update
 
     # Save the location into the tag_locations table
@@ -424,7 +425,7 @@ def add_tag_from_tcp():
     con.close()
 
     # Send response
-    return jsonify({"message": message, "tag": tag_name, "latitude": tag_latitude, "longitude": tag_longitude})
+    return jsonify({"message": message, "tag": tag_id, "latitude": tag_latitude, "longitude": tag_longitude})
 
 
 
@@ -610,6 +611,27 @@ def get_tag_location_history():
 
     except Exception as e:
         return jsonify({'error': f'Error occurred while fetching tag location history: {str(e)}'}), 500
+
+@app.route('/clear_tag_locations', methods=['GET'])
+def clear_tag_locations():
+    user_id = session.get('user_id')
+
+    if user_id is None:
+        return jsonify({'error': 'User not logged in'}), 401  # Unauthorized if no user is logged in
+
+    
+    try:
+        con = sqlite3.connect('users.db')
+        c = con.cursor()
+
+        c.execute("""
+            DELETE FROM tag_locations
+                  """)
+        con.commit()
+        con.close()
+        return jsonify({'message': 'Cleared out tag_locations successfully'}), 200
+    except Exception as e:
+        return jsonify({'error': f'Error occurred while deleting tag location history: {str(e)}'}), 500
 
 
 
