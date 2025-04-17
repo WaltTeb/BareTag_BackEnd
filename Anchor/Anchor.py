@@ -1,16 +1,20 @@
 import time
 
 class Anchor:
-    def __init__(self, id, x_coord, y_coord):
+    def __init__(self, id, x_coord, y_coord, z_coord=None):
         self.id = id
         self.x_coord = x_coord
         self.y_coord = y_coord
+        self.z_coord = z_coord
         self.tag_distances = {} # Dictionary to store distances from an anchor to each tag
         self.last_updated = 0
 
     def update_x_y_coord(self, x_coord, y_coord):
         self.x_coord = x_coord
         self.y_coord = y_coord
+
+    def updated_z_coord (self, z_coord):
+        self.z_coord = z_coord
     
     def update_dist(self, dist, tag_id):
         self.tag_distances[tag_id] = dist 
@@ -25,4 +29,4 @@ class Anchor:
         return self.updated
 
     def __str__(self):
-        return f"id = {self.id}, x_coord = {self.x_coord}, y_coord = {self.y_coord}"
+        return f"id = {self.id}, x_coord = {self.x_coord}, y_coord = {self.y_coord}, z_coord = {self.z_coord}"
