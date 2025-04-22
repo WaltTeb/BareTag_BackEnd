@@ -693,17 +693,20 @@ def save_boundary():
 
         # Save or replace user's boundary
         cur.execute("""INSERT OR REPLACE INTO boundaries
-                    (user_id, point1_lat, point1_lon,
-                    point2_lat, point2_lon,
-                    point3_lat, point3_lon,
-                    point4_lat, point4_lon)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    user_id,
-                    points[0]['lat'], points[0]['lon'],
-                    points[1]['lat'], points[1]['lon'],
-                    points[2]['lat'], points[2]['lon'],
-                    points[3]['lat'], points[3]['lon']
+            (user_id, point1_lat, point1_lon,
+            point2_lat, point2_lon,
+            point3_lat, point3_lon,
+            point4_lat, point4_lon)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                user_id,
+                points[0]['lat'], points[0]['lon'],
+                points[1]['lat'], points[1]['lon'],
+                points[2]['lat'], points[2]['lon'],
+                points[3]['lat'], points[3]['lon']
+            )
         )
+
 
         con.commit()
         return jsonify({'success': True}), 201
