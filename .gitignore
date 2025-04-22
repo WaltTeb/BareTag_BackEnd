@@ -5,3 +5,4 @@ Anchor/__pycache__/*
 flask.log
 .env
 venv/
+myvenv/
