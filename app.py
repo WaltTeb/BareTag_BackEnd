@@ -753,5 +753,26 @@ def get_boundaries():
     return jsonify({"points": points})
 
 
+@app.route('/delete_boundaries', methods=['POST'])
+def delete_all_boundaries():
+    user_id = session.get('user_id')
+
+    if user_id is None:
+        return jsonify({'error': 'User not logged in'}), 401
+
+    try:
+        con = sqlite3.connect('users.db')
+        cur = con.cursor()
+
+        cur.execute("DELETE FROM boundaries WHERE user_id = ?", (user_id,))
+        con.commit()
+        con.close()
+
+        return jsonify({'message': 'All boundaries deleted for this user.'}), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Error deleting boundaries: {str(e)}'}), 500
+
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
