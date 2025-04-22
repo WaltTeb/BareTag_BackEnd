@@ -589,7 +589,7 @@ def get_tag_location():
 
         # Fetch the latitude, longitude, and tag_name for all tags of the given user_id
         c.execute("""
-            SELECT tag_id, tag_name, latitude, longitude, status
+            SELECT tag_id, tag_name, latitude, longitude, altitude, status
             FROM tags
             WHERE user_id = ?
             """, (user_id,))
@@ -610,7 +610,8 @@ def get_tag_location():
                 'name': tag[1],
                 'latitude': tag[2],
                 'longitude': tag[3],
-                'status' : tag[4]   # Tells if tag is inside or outside boundary
+                'altitude': tag[4],
+                'status' : tag[5]   # Tells if tag is inside or outside boundary
             })
 
         # Return the list of tags with their locations
