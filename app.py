@@ -8,6 +8,7 @@ from werkzeug.utils import secure_filename
 import math
 from flask_session import Session  # ✅ Import Flask-Session
 from flask_cors import CORS
+from shapely.geomtry import Point, Polygon
 
 
 app = Flask(__name__)
@@ -409,6 +410,39 @@ def add_tag_from_tcp():
         con.commit()
         message = "New tag added successfully!"
 
+    # Fetch the user's boundary (assuming 4 corner points are stored)
+    cur.execute("SELECT point1_lat, point1_lon, point2_lat, point2_lon, point3_lat, point3_lon, point4_lat, point4_lon FROM boundaries WHERE user_id = ?", (user_id,))
+    boundary_points = cur.fetchone()
+
+    if not boundary_points:
+        con.close()
+        return jsonify({"error": "Boundary not found for user"}), 404
+
+    # Create the boundary polygon using Shapely
+    boundary_polygon = Polygon([
+        (boundary_points[0], boundary_points[1]),  # point 1
+        (boundary_points[2], boundary_points[3]),  # point 2
+        (boundary_points[4], boundary_points[5]),  # point 3
+        (boundary_points[6], boundary_points[7])   # point 4
+    ])
+
+    # Create a Shapely Point object for the tag's location
+    tag_point = Point(tag_longitude, tag_latitude)
+
+    # Check if the tag is within the boundary
+    if boundary_polygon.contains(tag_point):
+        tag_status = True  # Inside the boundary
+    else:
+        tag_status = False  # Outside the boundary
+
+    # Update the tag status
+    cur.execute("""
+        UPDATE tags
+        SET status = ?
+        WHERE tag_id = ?
+    """, (tag_status, tag_id))
+
+
     # Retrieve the tag_id of the newly inserted or updated tag
     cur.execute("SELECT tag_id FROM tags WHERE tag_id = ?", (tag_id,))
     print(type(cur))
@@ -555,7 +589,7 @@ def get_tag_location():
 
         # Fetch the latitude, longitude, and tag_name for all tags of the given user_id
         c.execute("""
-            SELECT tag_id, tag_name, latitude, longitude
+            SELECT tag_id, tag_name, latitude, longitude, status
             FROM tags
             WHERE user_id = ?
             """, (user_id,))
@@ -575,7 +609,8 @@ def get_tag_location():
                 'id': str(tag[0]),
                 'name': tag[1],
                 'latitude': tag[2],
-                'longitude': tag[3]
+                'longitude': tag[3],
+                'status' : tag[4]   # Tells if tag is inside or outside boundary
             })
 
         # Return the list of tags with their locations
@@ -632,6 +667,51 @@ def clear_tag_locations():
         return jsonify({'message': 'Cleared out tag_locations successfully'}), 200
     except Exception as e:
         return jsonify({'error': f'Error occurred while deleting tag location history: {str(e)}'}), 500
+    
+
+
+# —————————————————————————————————————————————————————— BOUNDARY ——————————————————————————————————————————————————————
+
+# Save the 4 coordinates of a boundary within a table
+@app.route('save_boundary', methods=['POST'])
+def save_boundary():
+    user_id = session.get('user_id')
+
+    if user_id is None:
+        return jsonify({'error': 'User not logged in'}), 401 # Unauthorized if no user logged in
+    
+    data = request.get_json()
+    points = data.get('points')
+
+    if not points or len(points) != 4:
+        return jsonify({"error": 'Exactly 4 boundary points are required'}), 400
+
+    try:
+        con = sqlite3.connect('users.db')
+        cur = con.cursor()
+
+        # Save or replace user's boundary
+        cur.execute("""INSERT OR REPLACE INTO boundaries
+                    (user_id, point1_lat, point1_lon,
+                    point2_lat, point2_lon,
+                    point3_lat, point3_lon,
+                    point4_lat, point4_lon)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    user_id,
+                    points[0]['lat'], points[0]['lon'],
+                    points[1]['lat'], points[1]['lon'],
+                    points[2]['lat'], points[2]['lon'],
+                    points[3]['lat'], points[3]['lon']
+        )
+
+        con.commit()
+        return jsonify({'success': True}), 201
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+    finally:
+        con.close()
 
 
 
