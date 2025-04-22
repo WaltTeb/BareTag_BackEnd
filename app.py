@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 import math
 from flask_session import Session  # ✅ Import Flask-Session
 from flask_cors import CORS
-from shapely.geomtry import Point, Polygon
+from shapely.geometry import Point, Polygon
 
 
 app = Flask(__name__)
