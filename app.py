@@ -674,7 +674,7 @@ def clear_tag_locations():
 # —————————————————————————————————————————————————————— BOUNDARY ——————————————————————————————————————————————————————
 
 # Save the 4 coordinates of a boundary within a table
-@app.route('save_boundary', methods=['POST'])
+@app.route('/save_boundary', methods=['POST'])
 def save_boundary():
     user_id = session.get('user_id')
 
