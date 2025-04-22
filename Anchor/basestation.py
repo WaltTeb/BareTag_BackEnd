@@ -147,11 +147,64 @@ try:
         for anchor in anchor_list: 
             # Construct message
             for tag in tags_list:
-                message = f"AT+SEND={anchor.id},{len(tag)+8},NEW_TAG:{tag}\r\n"
-                ser.write(message.encode()) # Send message over serial
-                time.sleep(1)
-                print(f"Sent to anchor {anchor.id}: {message.strip()}")
+                anchor_resp = ""
+                num_pings = 0
+                while anchor_resp[:19] != f'+RCV={anchor.id},9,ACK_NT:{tag}':
+                    if num_pings == 5:
+                        print(f"Failed to communicate with Anchor: {anchor.id}")
+                        exit()
+                    message = f"AT+SEND={anchor.id},{len(tag)+8},NEW_TAG:{tag}\r\n"
+                    num_pings += 1
+                    print(f"Sending: {message}")
+                    ser.write(message.encode()) # Send message over serial
+                #     # time.sleep(1)
+                    try:
+                        anchor_resp = ser.readline()
+                        anchor_resp = anchor_resp.decode("utf-8")
+                        while anchor_resp[:3] == "+OK":
+                            anchor_resp = ser.readline()
+                            anchor_resp = anchor_resp.decode("utf-8")
 
+                        print(f"Recieved: {anchor_resp[:19]}")
+                        
+                    except serial.SerialTimeoutException as te:
+                        print("Serial timedout waiting for uart ack")
+                        ser.write(message.encode()) # Send message over serial
+                        num_pings += 1
+                    
+                    if isinstance(anchor_resp, bytes):
+                        anchor_resp = anchor_resp.decode("utf-8")
+                
+                print(f"Registered Tag: {tag}, to Anchor: {anchor.id}")
+        
+        for anchor in anchor_list:
+            anchor_resp = ""
+            num_pings = 0
+            while anchor_resp[:19] != f'+RCV={anchor.id},9,ACK_BROAD':
+                if num_pings == 5:
+                    print(f"Failed to communicate with Anchor: {anchor.id}")
+                    exit()
+                message = f"AT+SEND={anchor.id},10,_BROADCAST\r\n"
+                num_pings += 1
+                print(f"Sending: {message}")
+                ser.write(message.encode()) # Send broadcast command
+
+                try:
+                    anchor_resp = ser.readline()
+                    anchor_resp = anchor_resp.decode("utf-8")
+                    while anchor_resp[:3] == "+OK":
+                        anchor_resp = ser.readline()
+                        anchor_resp = anchor_resp.decode("utf-8")
+                    print(f"Recieved: {anchor_resp[:19]}")
+
+                except serial.SerialTimeoutException as te:
+                    print("Serial timedout waiting for uart ack")
+                    ser.write(message.encode()) # Send message over serial
+                    num_pings += 1
+
+                if isinstance(anchor_resp, bytes):
+                        anchor_resp = anchor_resp.decode("utf-8")
+            print(f"Anchor: {anchor.id} now broadcasting")
 
         tag_distances = {}
         # Receiving distance measurements from anchors

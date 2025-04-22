@@ -395,9 +395,9 @@ def add_tag_from_tcp():
         # Tag exists, update latitude and longitude
         cur.execute("""
             UPDATE tags
-            SET tag_id = ?, user_id = ?, latitude = ?, longitude = ?
-            WHERE tag_name = ?
-        """, (tag_id, user_id, tag_latitude, tag_longitude, tag_name))
+            SET user_id = ?, latitude = ?, longitude = ?
+            WHERE tag_id = ?
+        """, (user_id, tag_latitude, tag_longitude, tag_id))
         message = "Tag updated successfully!"
 
     else:
