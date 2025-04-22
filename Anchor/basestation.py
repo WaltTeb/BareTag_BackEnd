@@ -8,6 +8,8 @@ import codecs
 import time
 from dotenv import load_dotenv
 import os
+import numpy as np
+from Multilateration_3D_Positioning import multilat_lib
 
 def trilaterate(anchors, distances):
     x1 = anchors[0].x_coord
@@ -102,7 +104,7 @@ try:
     print("Anchors from server:", anchors_data)
 
     # Initialize Anchor
-
+    anchor_coords = []  # in geo-coordinates
     anchor_list = []
     anchor_dict = {}
 
@@ -113,15 +115,21 @@ try:
     # Get the minimum latitude and longitude (used for the origin point)
     min_lat = min_anchor['latitude']
     min_lon = min_anchor['longitude']
+    min_alt = min_anchor['altitude']
 
     # Convert all anchors to x,y positions relative to the anchor with the smallest latitude
     for anchor in anchors_data:
         # Calculate the x and y distance from the min_lat/min_lon anchor
-        x = (anchor['longitude'] - min_lon) * 111320 * math.cos(math.radians(min_lat))  # X in meters
-        y = (anchor['latitude'] - min_lat) * 111320  # Y in meters
+        longitude = anchor['longitude']
+        latitude = anchor['latitude']
+        altitude = anchor['altitude']
+        anchor_coords.append([longitude, latitude, altitude])
+        x = (longitude - min_lon) * 111320 * math.cos(math.radians(min_lat))  # X in meters
+        y = (latitude - min_lat) * 111320  # Y in meters
+        z = anchor['altitude'] - min_alt
 
         # Use latitude and longitude difference as x and y
-        new_anchor = Anchor(anchor['id'], x, y)
+        new_anchor = Anchor(anchor['id'], x, y, z)
         anchor_list.append(new_anchor)
         anchor_dict[new_anchor.id] = new_anchor
     
@@ -242,7 +250,12 @@ try:
                     tag_latitude, tag_longitude = meters_to_lat_long(tag_location[0], tag_location[1], min_anchor)
                     print(f"Tag Latitude {tag_latitude}, Tag Longitude: {tag_longitude}") # debugging
 
-
+                    ''' Estimate the z location of the tag '''
+                    # Convert anchor_list [class Anchor] to [[x,y,z]]
+                    estimated_z = multilat_lib.brute_force(anchor_coords=anchor_coords, x=tag_location[0], y=tag_location[1], distances=distances)
+                    estimated_local = np.array([tag_location[0], tag_location[1], estimated_z])  # local x, y, z
+                    tag_altitude = multilat_lib.local_to_geo(estimated_local, min_anchor)[2]
+                    
                     # Collect the IDs of the anchors used
                     used_anchors = list(measurements.keys())
 
@@ -252,6 +265,7 @@ try:
                         "tag_id": f"{tag_id}",
                         "latitude": tag_latitude, # X offset in meters
                         "longitude": tag_longitude,  # Y offset in meters
+                        "altitude": tag_altitude,
                         "user_id": 1,   # Assume user_id is provided
                         # "anchor_ids": used_anchors # Include the anchor IDs used
                     }
