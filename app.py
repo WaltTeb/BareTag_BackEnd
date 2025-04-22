@@ -718,6 +718,40 @@ def save_boundary():
         con.close()
 
 
+@app.route('/get_boundaries', methods=['GET'])
+def get_boundaries():
+    user_id = session.get('user_id')
+
+    if user_id is None:
+        return jsonify({'error': 'User not logged in'}), 401
+
+    con = sqlite3.connect('users.db')
+    cur = con.cursor()
+
+    cur.execute("""
+        SELECT point1_lat, point1_lon,
+               point2_lat, point2_lon,
+               point3_lat, point3_lon,
+               point4_lat, point4_lon
+        FROM boundaries
+        WHERE user_id = ?
+    """, (user_id,))
+
+    row = cur.fetchone()
+    con.close()
+
+    if not row:
+        return jsonify({'message': 'No boundary found'}), 404
+
+    points = [
+        {"lat": row[0], "lon": row[1]},
+        {"lat": row[2], "lon": row[3]},
+        {"lat": row[4], "lon": row[5]},
+        {"lat": row[6], "lon": row[7]}
+    ]
+
+    return jsonify({"points": points})
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
