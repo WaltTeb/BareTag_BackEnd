@@ -774,5 +774,26 @@ def delete_all_boundaries():
         return jsonify({'error': f'Error deleting boundaries: {str(e)}'}), 500
 
 
+@app.route('/set_tag_status', methods=['GET'])
+def set_tag_status():
+    tag_id = request.args.get('tag_id')
+    status = request.args.get('status')
+
+    if not tag_id or status is None:
+        return jsonify({'error': 'Missing tag_id or status'}), 400
+
+    try:
+        status_bool = status.lower() == 'true'
+    except:
+        return jsonify({'error': 'Invalid status'}), 400
+
+    conn = get_db_connection()
+    conn.execute('UPDATE tags SET status = ? WHERE id = ?', (status_bool, tag_id))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'message': 'Tag status updated successfully'})
+
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
