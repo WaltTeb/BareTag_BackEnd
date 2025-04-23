@@ -611,7 +611,7 @@ def get_tag_location():
                 'latitude': tag[2],
                 'longitude': tag[3],
                 'altitude': tag[4],
-                'status' : tag[5]   # Tells if tag is inside or outside boundary
+                'status' : bool(tag[5])   # Tells if tag is inside or outside boundary
             })
 
         # Return the list of tags with their locations
