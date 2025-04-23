@@ -788,7 +788,7 @@ def set_tag_status_by_id():
         return jsonify({'error': 'Invalid status'}), 400
 
     con = sqlite3.connect('users.db')
-    con.execute('UPDATE tags SET status = ? WHERE id = ?', (status_bool, tag_id))
+    con.execute('UPDATE tags SET status = ? WHERE tag_id = ?', (status_bool, tag_id))
     con.commit()
     con.close()
 
