@@ -775,7 +775,7 @@ def delete_all_boundaries():
 
 
 @app.route('/set_tag_status', methods=['GET'])
-def set_tag_status():
+def set_tag_status_by_id():
     tag_id = request.args.get('tag_id')
     status = request.args.get('status')
 
@@ -787,10 +787,10 @@ def set_tag_status():
     except:
         return jsonify({'error': 'Invalid status'}), 400
 
-    conn = get_db_connection()
-    conn.execute('UPDATE tags SET status = ? WHERE id = ?', (status_bool, tag_id))
-    conn.commit()
-    conn.close()
+    con = sqlite3.connect('users.db')
+    con.execute('UPDATE tags SET status = ? WHERE id = ?', (status_bool, tag_id))
+    con.commit()
+    con.close()
 
     return jsonify({'message': 'Tag status updated successfully'})
 
