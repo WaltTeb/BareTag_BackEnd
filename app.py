@@ -9,10 +9,15 @@ import math
 from flask_session import Session  # ✅ Import Flask-Session
 from flask_cors import CORS
 from shapely.geometry import Point, Polygon
+import subprocess
+from apscheduler.schedulers.background import BackgroundScheduler
+import threading
+import time
 
 
 app = Flask(__name__)
 app.secret_key = "__privatekey__"
+
 
 @app.route('/') # home page
 def Home():
@@ -312,6 +317,80 @@ def delete_anchor():
 # NEED KEN TO SEND TAG INFO WITH TAG NAME, LATITUDE, and LONGITUDE
 # Very SIMILAR TO ADDING AN ANCHOR
 
+# Helper Function to help get latitude and longitude from the anisette server
+# Will run the request_reports.py script and process the output
+python_exec = "/home/sdp3/haystackk/FindMy/venv/bin/python3"
+program_path = "/home/sdp3/haystackk/FindMy/request_reports.py"
+
+def run_request_report():
+    try:
+        result = subprocess.run([python_exec, program_path],
+        capture_output=True,
+        text=True,
+        check=True
+        )
+        start_index = result.stdout.find('[')
+        end_index = result.stdout.rfind(']')
+
+        if start_index != -1 and end_index != -1:
+            json_str = result.stdout[start_index:end_index + 1]
+
+            ble_data = json.loads(json_str)
+        return ble_data
+    except subprocess.CalledProcessError as e:
+        print("Error running request_reports.py:", e.stderr)
+        return []
+
+def fetch_ble_locations_periodically():
+    while True:
+        ble_data = run_request_report()
+        print(json.dumps(ble_data, indent=2))
+
+        
+        try:
+            con = sqlite3.connect('users.db', timeout=10)
+            cur = con.cursor()
+
+            for tag in ble_data:
+                tag_id = tag['tag_id']
+                lat = tag['latitude']
+                lon = tag['longitude']
+                timestamp = tag['timestamp']
+                # Check if the tag already exists in the tags table by tag_name
+                cur.execute("SELECT * FROM tags WHERE tag_id = ?", (tag_id,))
+                existing_tag = cur.fetchone()
+
+                if existing_tag:
+                    # Tag exists, update latitude and longitude
+                    cur.execute("""
+                        UPDATE tags
+                        SET user_id = ?, ble_lat = ?, ble_long = ?
+                        WHERE tag_id = ?
+                    """, (10, lat, lon, tag_id))
+                    message = "Tag updated successfully!"
+                
+                else:
+                    # Tag doesn't exists, add new tag
+                    cur.execute("""
+                        INSERT INTO tags (tag_id, user_id, tag_name, ble_lat, ble_long)
+                        VALUES (?, ?, ?, ?, ?)
+                        """, (tag_id, 10, "NEW ONE", lat, lon))
+                    message = "New tag added successfully!"
+
+                # Insert into `tag_locations`
+                cur.execute("""
+                    INSERT INTO tag_locations (tag_id, latitude, longitude, timestamp)
+                    VALUES (?, ?, ?, ?)
+                    """, (tag_id, lat, lon, timestamp))
+
+            con.commit()
+            con.close()
+            #    print(f"[BLE Worker] Successfully updated {len(ble_data)} tags.")
+        except Exception as e:
+            print(f"[BLE Worker] Error updating BLE data: {e}")
+
+        time.sleep(60)  # Wait 1 minute
+"""
 @app.route('/add_tag', methods=['POST'])
 def add_tag_location():
     # Get user_id from session
@@ -341,9 +420,9 @@ def add_tag_location():
         if not existing_tag:
             # If the tag doesn't exist, insert it into the tags table
             c.execute("""
-                INSERT INTO tags (tag_name, user_id, latitude, longitude)
-                VALUES (?, ?, ?, ?)
-            """, (tag_name, user_id, x_offset, y_offset))  # Default location set to 0.0, 0.0
+              #  INSERT INTO tags (tag_name, user_id, latitude, longitude)
+               # VALUES (?, ?, ?, ?)
+          #  """, (tag_name, user_id, x_offset, y_offset))  # Default location set to 0.0, 0.0
 
         # Fetch the anchor's GPS coordinates
         #c.execute("SELECT latitude, longitude FROM anchors WHERE id=?", (anchor_id,))
@@ -361,13 +440,13 @@ def add_tag_location():
         #           (tag_id, tag_lat, tag_lon, "UWB"))
 
         # # Commit the transaction
-        con.commit()
-        con.close()
+        #con.commit()
+        #con.close()
 
-        return jsonify({'message': 'Tag location successfully added and updated'}), 201
+        #return jsonify({'message': 'Tag location successfully added and updated'}), 201
 
-    except Exception as e:
-        return jsonify({'error': f'Error occurred while adding tag location: {str(e)}'}), 500
+    #except Exception as e:
+        #return jsonify({'error': f'Error occurred while adding tag location: {str(e)}'}), 500
 
 
 @app.route('/add_tag_tcp', methods=['POST'])
@@ -589,7 +668,7 @@ def get_tag_location():
 
         # Fetch the latitude, longitude, and tag_name for all tags of the given user_id
         c.execute("""
-            SELECT tag_id, tag_name, latitude, longitude, altitude, status
+            SELECT tag_id, tag_name, latitude, longitude, altitude, status, ble_lat, ble_lon
             FROM tags
             WHERE user_id = ?
             """, (user_id,))
@@ -605,14 +684,30 @@ def get_tag_location():
         # Prepare the response with a list of tags and their locations
         result = []
         for tag in tags_locations:
-            result.append({
-                'id': str(tag[0]),
-                'name': tag[1],
-                'latitude': tag[2],
-                'longitude': tag[3],
-                'altitude': tag[4],
-                'status' : bool(tag[5])   # Tells if tag is inside or outside boundary
-            })
+            tag_id, tag_name, lat, lon, alt, status, ble_lat, ble_lon = tag
+
+            if status is None or bool(status):
+                # Tag is within UWB zone
+                result.append({
+                    'id': str(tag_id),
+                    'name': tag_name,
+                    'latitude': lat,
+                    'longitude': lon,
+                    'altitude': alt,
+                    'status': True,
+                })
+            else:
+                # Tag is outside UWB zone, use BLE
+                result.append({
+                    'id': str(tag_id),
+                    'name': tag_name,
+                    'latitude': ble_lat,
+                    'longitude': ble_lon,
+                    'altitude': alt,
+                    'status': False,
+                })
+
+
 
         # Return the list of tags with their locations
         return jsonify({'tags_location': result}), 200
@@ -796,4 +891,7 @@ def set_tag_status_by_id():
 
 
 if __name__ == "__main__":
+    ble_thread = threading.Thread(target=fetch_ble_locations_periodically, daemon=True)
+    ble_thread.start()
+
     app.run(debug=True, host="0.0.0.0", port=5000)

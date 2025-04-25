@@ -5,9 +5,9 @@ import os
 
 load_dotenv()
 
-#BASE_URL = "http://localhost:5000"
+BASE_URL = "http://localhost:5000"
 # BASE_URL = "http://172.24.131.25:5000"
-BASE_URL = f"{os.environ['BASE_URL']}"
+#BASE_URL = f"{os.environ['BASE_URL']}"
 USERNAME = "sean"
 PASSWORD = "sean"
 
