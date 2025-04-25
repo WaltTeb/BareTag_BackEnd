@@ -356,25 +356,34 @@ def fetch_ble_locations_periodically():
                 lat = tag['latitude']
                 lon = tag['longitude']
                 timestamp = tag['timestamp']
+
+                # Convert timestamp to SQL datetime format
+                ble_datetime = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+
                 # Check if the tag already exists in the tags table by tag_name
                 cur.execute("SELECT * FROM tags WHERE tag_id = ?", (tag_id,))
                 existing_tag = cur.fetchone()
+
+                # Get current number of tags in tag table
+                cur.execute("SELECT COUNT(*) FROM tags")
+                tag_count = cur.fetchone()[0]
+                tag_name = f"tag {tag_count + 1}"
 
                 if existing_tag:
                     # Tag exists, update latitude and longitude
                     cur.execute("""
                         UPDATE tags
-                        SET user_id = ?, ble_lat = ?, ble_long = ?
+                        SET user_id = ?, ble_lat = ?, ble_long = ?, ble_timestamp = ?
                         WHERE tag_id = ?
-                    """, (10, lat, lon, tag_id))
+                    """, (1, lat, lon, ble_datetime, tag_id))
                     message = "Tag updated successfully!"
-                
+
                 else:
                     # Tag doesn't exists, add new tag
                     cur.execute("""
-                        INSERT INTO tags (tag_id, user_id, tag_name, ble_lat, ble_long)
-                        VALUES (?, ?, ?, ?, ?)
-                        """, (tag_id, 10, "NEW ONE", lat, lon))
+                        INSERT INTO tags (tag_id, user_id, tag_name, ble_lat, ble_long, ble_timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """, (tag_id, 1, tag_name, lat, lon, ble_datetime))
                     message = "New tag added successfully!"
 
                 # Insert into `tag_locations`
@@ -389,7 +398,7 @@ def fetch_ble_locations_periodically():
         except Exception as e:
             print(f"[BLE Worker] Error updating BLE data: {e}")
 
-        time.sleep(60)  # Wait 1 minute
+        time.sleep(30)  # Wait 30 seoncds
 """
 @app.route('/add_tag', methods=['POST'])
 def add_tag_location():
@@ -475,7 +484,7 @@ def add_tag_from_tcp():
         # Tag exists, update latitude and longitude
         cur.execute("""
             UPDATE tags
-            SET user_id = ?, latitude = ?, longitude = ?
+            SET user_id = ?, latitude = ?, longitude = ?, created_at = DATETIME('now' '-4 hours')
             WHERE tag_id = ?
         """, (user_id, tag_latitude, tag_longitude, tag_id))
         message = "Tag updated successfully!"
@@ -668,7 +677,7 @@ def get_tag_location():
 
         # Fetch the latitude, longitude, and tag_name for all tags of the given user_id
         c.execute("""
-            SELECT tag_id, tag_name, latitude, longitude, altitude, status, ble_lat, ble_lon
+            SELECT tag_id, tag_name, latitude, longitude, altitude, status, created_at, ble_lat, ble_lon, ble_timestamp
             FROM tags
             WHERE user_id = ?
             """, (user_id,))
@@ -677,40 +686,43 @@ def get_tag_location():
         tags_locations = c.fetchall()
         con.close()
 
-        # If no tags are found, return an appropriate message
-        if not tags_locations:
-            return jsonify({'message': 'No tags found for the specified user'}), 404
-
-        # Prepare the response with a list of tags and their locations
         result = []
         for tag in tags_locations:
-            tag_id, tag_name, lat, lon, alt, status, ble_lat, ble_lon = tag
+            tag_id, tag_name, lat, lon, alt, status, created_at, ble_lat, ble_lon, ble_ts = tag
+            # Compare timestamps
+            use_uwb = False
+            if ble_ts and created_at:
+                use_uwb = created_at > ble_ts
+            elif created_at: # only ble timestamp
+                use_uwb = True
+        if use_uwb:
+            # Tag is within UWB zone
+            print("sending uwb")
+            result.append({
+                'id': str(tag_id),
+                'name': tag_name,
+                'latitude': lat,
+                'longitude': lon,
+                'altitude': alt,
+                'status': True,
+            })
+        else:
+            # Tag is outside UWB zone, use BLE
+            print("sending ble")
+            result.append({
+                'id': str(tag_id),
+                'name': tag_name,
+                'latitude': ble_lat,
+                'longitude': ble_lon,
+                'altitude': alt,
+                'status': False,
+            })
 
-            if status is None or bool(status):
-                # Tag is within UWB zone
-                result.append({
-                    'id': str(tag_id),
-                    'name': tag_name,
-                    'latitude': lat,
-                    'longitude': lon,
-                    'altitude': alt,
-                    'status': True,
-                })
-            else:
-                # Tag is outside UWB zone, use BLE
-                result.append({
-                    'id': str(tag_id),
-                    'name': tag_name,
-                    'latitude': ble_lat,
-                    'longitude': ble_lon,
-                    'altitude': alt,
-                    'status': False,
-                })
-
-
+        
 
         # Return the list of tags with their locations
         return jsonify({'tags_location': result}), 200
+        
 
     except Exception as e:
         return jsonify({'error': f'Error occurred while fetching tags location: {str(e)}'}), 500

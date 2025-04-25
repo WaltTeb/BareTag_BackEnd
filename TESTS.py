@@ -91,5 +91,5 @@ if __name__ == "__main__":
 
         # Register two tags after adding the anchors
         user_id = 1  # Assuming you have a valid user_id; replace with actual user_id if needed.
-        add_tag("CD", "Tag 1", lat1 + METERS_TO_DEGREES_LAT, lon1, user_id, cookies)  # Tag 1 at +10m latitude
-        add_tag("GH", "Tag 2", lat1, lon1 + METERS_TO_DEGREES_LON, user_id, cookies)  # Tag 2 at +10m longitude
+        add_tag("CD", "tag 1", lat1 + METERS_TO_DEGREES_LAT, lon1, user_id, cookies)  # Tag 1 at +10m latitude
+        add_tag("GH", "tag 2", lat1, lon1 + METERS_TO_DEGREES_LON, user_id, cookies)  # Tag 2 at +10m longitude
