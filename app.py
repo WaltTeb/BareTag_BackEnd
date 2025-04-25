@@ -705,7 +705,7 @@ def get_tag_location():
                     'latitude': lat,
                     'longitude': lon,
                     'altitude': alt,
-                    'status': True,
+                    'status': status,
                 })
             else:
                 # Tag is outside UWB zone, use BLE
@@ -714,9 +714,9 @@ def get_tag_location():
                     'id': str(tag_id),
                     'name': tag_name,
                     'latitude': ble_lat,
-                    'longitude': ble_lon,
+                    'longitude': ble_long,
                     'altitude': alt,
-                    'status': False,
+                    'status': status,
                 })
 
         
