@@ -689,18 +689,18 @@ def get_tag_location():
         result = []
         for tag in tags_locations:
             tag_id, tag_name, lat, lon, alt, status, created_at, ble_lat, ble_long, ble_ts = tag
-            # Compare timestamps
+
+            # Determine which timestamp is more recent
             use_uwb = False
             if ble_ts and created_at:
                 use_uwb = created_at > ble_ts
-            elif created_at: # only ble timestamp
+            elif created_at:
                 use_uwb = True
-            
+
             if use_uwb:
-                # Tag is within UWB zone
                 print("sending uwb")
                 result.append({
-                    'id': str(tag_id),
+                    'id': tag_id,
                     'name': tag_name,
                     'latitude': lat,
                     'longitude': lon,
@@ -708,10 +708,9 @@ def get_tag_location():
                     'status': status,
                 })
             else:
-                # Tag is outside UWB zone, use BLE
-                print("sending ble")
+                print(f"{tag_name} + lat: {ble_lat} + long: {ble_long}")
                 result.append({
-                    'id': str(tag_id),
+                    'id': tag_id,
                     'name': tag_name,
                     'latitude': ble_lat,
                     'longitude': ble_long,
