@@ -677,7 +677,7 @@ def get_tag_location():
 
         # Fetch the latitude, longitude, and tag_name for all tags of the given user_id
         c.execute("""
-            SELECT tag_id, tag_name, latitude, longitude, altitude, status, created_at, ble_lat, ble_lon, ble_timestamp
+            SELECT tag_id, tag_name, latitude, longitude, altitude, status, created_at, ble_lat, ble_long, ble_timestamp
             FROM tags
             WHERE user_id = ?
             """, (user_id,))
@@ -688,35 +688,36 @@ def get_tag_location():
 
         result = []
         for tag in tags_locations:
-            tag_id, tag_name, lat, lon, alt, status, created_at, ble_lat, ble_lon, ble_ts = tag
+            tag_id, tag_name, lat, lon, alt, status, created_at, ble_lat, ble_long, ble_ts = tag
             # Compare timestamps
             use_uwb = False
             if ble_ts and created_at:
                 use_uwb = created_at > ble_ts
             elif created_at: # only ble timestamp
                 use_uwb = True
-        if use_uwb:
-            # Tag is within UWB zone
-            print("sending uwb")
-            result.append({
-                'id': str(tag_id),
-                'name': tag_name,
-                'latitude': lat,
-                'longitude': lon,
-                'altitude': alt,
-                'status': True,
-            })
-        else:
-            # Tag is outside UWB zone, use BLE
-            print("sending ble")
-            result.append({
-                'id': str(tag_id),
-                'name': tag_name,
-                'latitude': ble_lat,
-                'longitude': ble_lon,
-                'altitude': alt,
-                'status': False,
-            })
+            
+            if use_uwb:
+                # Tag is within UWB zone
+                print("sending uwb")
+                result.append({
+                    'id': str(tag_id),
+                    'name': tag_name,
+                    'latitude': lat,
+                    'longitude': lon,
+                    'altitude': alt,
+                    'status': True,
+                })
+            else:
+                # Tag is outside UWB zone, use BLE
+                print("sending ble")
+                result.append({
+                    'id': str(tag_id),
+                    'name': tag_name,
+                    'latitude': ble_lat,
+                    'longitude': ble_lon,
+                    'altitude': alt,
+                    'status': False,
+                })
 
         
 
