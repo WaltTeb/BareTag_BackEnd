@@ -234,7 +234,7 @@ def get_anchors():
         if not user_id:
             return jsonify({'error': 'User not logged in'}), 401  # Unauthorized
         
-        print(f"User ID received: {user_id}")
+       # print(f"User ID received: {user_id}")
 
 
         # ✅ Connect to SQLite database
@@ -244,7 +244,7 @@ def get_anchors():
         # ✅ Fetch only the anchors belonging to the logged-in user
         cur.execute("SELECT anchor_id, anchor_name, latitude, longitude, altitude FROM anchors WHERE user_id=?", (user_id,))
         anchors = cur.fetchall()
-        print("Anchors fetched from DB:", anchors)  # Debug print
+       # print("Anchors fetched from DB:", anchors)  # Debug print
         con.close()
 
         # ✅ Convert data to JSON format
@@ -336,6 +336,7 @@ def run_request_report():
             json_str = result.stdout[start_index:end_index + 1]
 
             ble_data = json.loads(json_str)
+            print(ble_data)
         return ble_data
     except subprocess.CalledProcessError as e:
         print("Error running request_reports.py:", e.stderr)
@@ -344,7 +345,6 @@ def run_request_report():
 def fetch_ble_locations_periodically():
     while True:
         ble_data = run_request_report()
-        print(json.dumps(ble_data, indent=2))
 
         
         try:
@@ -352,6 +352,7 @@ def fetch_ble_locations_periodically():
             cur = con.cursor()
 
             for tag in ble_data:
+
                 tag_id = tag['tag_id']
                 lat = tag['latitude']
                 lon = tag['longitude']
@@ -398,7 +399,7 @@ def fetch_ble_locations_periodically():
         except Exception as e:
             print(f"[BLE Worker] Error updating BLE data: {e}")
 
-        time.sleep(30)  # Wait 30 seoncds
+        time.sleep(10)  # Wait 30 seoncds
 """
 @app.route('/add_tag', methods=['POST'])
 def add_tag_location():
@@ -484,7 +485,7 @@ def add_tag_from_tcp():
         # Tag exists, update latitude and longitude
         cur.execute("""
             UPDATE tags
-            SET user_id = ?, latitude = ?, longitude = ?, created_at = DATETIME('now' '-4 hours')
+            SET user_id = ?, latitude = ?, longitude = ?, created_at = DATETIME('now', '-4 hours')
             WHERE tag_id = ?
         """, (user_id, tag_latitude, tag_longitude, tag_id))
         message = "Tag updated successfully!"
@@ -502,33 +503,35 @@ def add_tag_from_tcp():
     cur.execute("SELECT point1_lat, point1_lon, point2_lat, point2_lon, point3_lat, point3_lon, point4_lat, point4_lon FROM boundaries WHERE user_id = ?", (user_id,))
     boundary_points = cur.fetchone()
 
-    if not boundary_points:
-        con.close()
-        return jsonify({"error": "Boundary not found for user"}), 404
+    if boundary_points:
+        try:
+            # Create the boundary polygon using Shapely
+            boundary_polygon = Polygon([
+                (boundary_points[0], boundary_points[1]),  # point 1
+                (boundary_points[2], boundary_points[3]),  # point 2
+                (boundary_points[4], boundary_points[5]),  # point 3
+                (boundary_points[6], boundary_points[7])   # point 4
+            ])
 
-    # Create the boundary polygon using Shapely
-    boundary_polygon = Polygon([
-        (boundary_points[0], boundary_points[1]),  # point 1
-        (boundary_points[2], boundary_points[3]),  # point 2
-        (boundary_points[4], boundary_points[5]),  # point 3
-        (boundary_points[6], boundary_points[7])   # point 4
-    ])
+            # Create a Shapely Point object for the tag's location
+            tag_point = Point(tag_longitude, tag_latitude)
 
-    # Create a Shapely Point object for the tag's location
-    tag_point = Point(tag_longitude, tag_latitude)
+            # Check if the tag is within the boundary
+            if boundary_polygon.contains(tag_point):
+                tag_status = True  # Inside the boundary
+            else:
+                tag_status = False  # Outside the boundary
 
-    # Check if the tag is within the boundary
-    if boundary_polygon.contains(tag_point):
-        tag_status = True  # Inside the boundary
+            # Update the tag status
+            cur.execute("""
+                UPDATE tags
+                SET status = ?
+                WHERE tag_id = ?
+            """, (tag_status, tag_id))
+        except Exception as e:
+            print("Boundary check failed:", e) # Safe logging
     else:
-        tag_status = False  # Outside the boundary
-
-    # Update the tag status
-    cur.execute("""
-        UPDATE tags
-        SET status = ?
-        WHERE tag_id = ?
-    """, (tag_status, tag_id))
+        print(f"No boundary found for user_id {user_id}. Skipping boundary check.")
 
 
     # Retrieve the tag_id of the newly inserted or updated tag
@@ -666,7 +669,6 @@ def delete_tag():
 def get_tag_location():
     # Get user_id from session
     user_id = session.get('user_id') or request.args.get('user_id')
-
     if user_id is None:
         return jsonify({'error': 'User not logged in'}), 401  # Unauthorized if no user is logged in
 
@@ -682,9 +684,23 @@ def get_tag_location():
             WHERE user_id = ?
             """, (user_id,))
 
-        # Fetch all the results
+        # Fetch the tag data
         tags_locations = c.fetchall()
-        con.close()
+        print(f"Tags fetched; {tags_locations}")
+        # Fetch boundary points
+        c.execute("""
+            SELECT point1_lat, point1_lon, point2_lat, point2_lon,
+                   point3_lat, point3_lon, point4_lat, point4_lon
+            FROM boundaries WHERE user_id = ?
+        """, (user_id,))
+   
+
+        boundary_polygon = Polygon([
+            (boundary[1], boundary[0]),  # lon, lat
+            (boundary[3], boundary[2]),
+            (boundary[5], boundary[4]),
+            (boundary[7], boundary[6])
+        ])
 
         result = []
         for tag in tags_locations:
@@ -694,32 +710,39 @@ def get_tag_location():
             use_uwb = False
             if ble_ts and created_at:
                 use_uwb = created_at > ble_ts
-            elif created_at:
+            elif created_at and not ble_ts:
                 use_uwb = True
+            elif ble_ts and not created_at:
+                use_uwb = False
+            else:
+                # If both timestamps are missing, skip this tag
+                continue
 
             if use_uwb:
-                print("sending uwb")
-                result.append({
-                    'id': tag_id,
-                    'name': tag_name,
-                    'latitude': lat,
-                    'longitude': lon,
-                    'altitude': alt,
-                    'status': status,
-                })
+                lat_to_use = lat
+                lon_to_use = lon
             else:
-                print(f"{tag_name} + lat: {ble_lat} + long: {ble_long}")
-                result.append({
-                    'id': tag_id,
-                    'name': tag_name,
-                    'latitude': ble_lat,
-                    'longitude': ble_long,
-                    'altitude': alt,
-                    'status': status,
-                })
+                lat_to_use = ble_lat
+                lon_to_use = ble_long
 
+            # Check if point is within boundary
+            tag_point = Point(lon_to_use, lat_to_use)
+            inside = boundary_polygon.contains(tag_point)
+
+            if inside != bool(status):
+                c.execute("UPDATE tags SET status = ? WHERE tag_id = ?", (inside, tag_id))
+
+            result.append({
+                'id': tag_id,
+                'name': tag_name,
+                'latitude': lat_to_use,
+                'longitude': lon_to_use,
+                'altitude': alt,
+                'status': inside,
+            })
         
-
+        con.commit()
+        con.close()
         # Return the list of tags with their locations
         return jsonify({'tags_location': result}), 200
         

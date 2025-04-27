@@ -43,7 +43,7 @@ def meters_to_lat_long(x_offset, y_offset, reference_anchor):
 
 # --------------------------- RUNNING CODE ---------------------------
 try:
-    lora_usb_port = "/dev/ttyUSB0"
+    lora_usb_port = "/dev/ttyUSB1"
     user_id = 1
     anchors_data = get_anchors_from_server(user_id)
     print("Anchors from server:", anchors_data)
